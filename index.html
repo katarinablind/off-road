@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Off-Road Topology</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%;overflow:hidden;background:#eae6d8}
+    #topo{position:fixed;inset:0;z-index:0}
+    #car-canvas{position:fixed;left:0;top:0;z-index:1;pointer-events:none}
+
+    #overlay{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(234,230,216,.78);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);transition:opacity 1s ease;font-family:'Inter',-apple-system,sans-serif}
+    #overlay.hidden{opacity:0;pointer-events:none}
+    #overlay h1{font-weight:300;font-size:clamp(32px,6vw,56px);color:#3a4a3a;letter-spacing:.05em}
+    .subtitle{font-size:13px;color:rgba(80,100,80,.5);letter-spacing:.15em;text-transform:uppercase;margin-top:16px}
+
+    .mode-row{display:flex;gap:8px;margin-top:24px}
+    .btn{padding:10px 28px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#4a6a4a;border:1px solid rgba(80,120,80,.3);border-radius:3px;background:rgba(80,120,80,.06);cursor:pointer;transition:all .3s;font-family:inherit}
+    .btn:hover{color:#2a4a2a;border-color:rgba(60,100,60,.5);background:rgba(80,120,80,.12)}
+    .btn.active{background:rgba(60,100,60,.18);border-color:rgba(50,90,50,.5);color:#1a3a1a}
+    .btn:disabled{opacity:.35;cursor:not-allowed}
+
+    #together-panel{margin-top:16px;text-align:center;display:none}
+    #together-panel p{font-size:11px;color:rgba(80,100,80,.5);margin-bottom:8px}
+    #session-link{width:340px;max-width:80vw;padding:8px 12px;font-size:11px;font-family:'SF Mono',monospace;color:#3a5a3a;background:rgba(255,255,255,.5);border:1px solid rgba(80,120,80,.25);border-radius:3px;text-align:center;cursor:pointer}
+    #peer-status{margin-top:8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(80,100,80,.4)}
+    #peer-status.connected{color:#3a6a3a;font-weight:500}
+    @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+    .waiting{animation:pulse 2s infinite}
+
+    .settings-toggle{margin-top:20px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(80,100,80,.4);cursor:pointer;border:none;background:none;font-family:inherit;transition:color .3s}
+    .settings-toggle:hover{color:rgba(80,100,80,.7)}
+    #settings-panel{margin-top:12px;display:none;gap:6px;flex-wrap:wrap;justify-content:center}
+    #settings-panel.open{display:flex}
+
+    .drive-btn{margin-top:24px;padding:12px 40px;font-size:12px}
+
+    #countdown{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:clamp(60px,15vw,120px);font-weight:200;color:rgba(58,74,58,.7);pointer-events:none;opacity:0;transition:opacity .25s}
+    #countdown.visible{opacity:1}
+
+    #hud-left,#hud-right{position:fixed;top:20px;z-index:50;pointer-events:none;opacity:0;transition:opacity .6s;font-family:'SF Mono','Fira Code',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;line-height:2;color:rgba(80,100,80,.45)}
+    #hud-left{left:24px}
+    #hud-right{right:24px;text-align:right;display:none}
+    #hud-left.visible,#hud-right.visible{opacity:1}
+    .hud-val{color:rgba(50,70,50,.8)}
+    .hud-title{font-family:'Inter',sans-serif;font-size:14px;font-weight:300;color:rgba(50,70,50,.65);letter-spacing:.03em;text-transform:none;margin-bottom:6px}
+    #offroad-flash{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 50%,rgba(200,120,50,.08) 0%,transparent 60%);transition:opacity .15s}
+    #offroad-flash.visible{opacity:1}
+    #controls-hint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:50;pointer-events:none;font-family:'SF Mono',monospace;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:rgba(80,100,80,.3);opacity:0;transition:opacity .6s}
+    #controls-hint.visible{opacity:1}
+    #map-label{position:fixed;top:20px;right:24px;z-index:50;pointer-events:none;opacity:0;transition:opacity .6s;text-align:right;font-family:'SF Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(120,100,80,.3);line-height:1.8}
+    #map-label.visible{opacity:1}
+    #timer{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:50;pointer-events:none;font-family:'SF Mono','Fira Code',monospace;font-size:18px;letter-spacing:.1em;color:rgba(50,70,50,.7);opacity:0;transition:opacity .6s}
+    #timer.visible{opacity:1}
+
+    #finish-screen{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(234,230,216,.95);font-family:'Inter',-apple-system,sans-serif;opacity:0;pointer-events:none;transition:opacity .8s ease}
+    #finish-screen.visible{opacity:1;pointer-events:auto}
+    #finish-screen h2{font-weight:300;font-size:36px;color:#3a5a3a;margin-bottom:16px}
+    .stat{font-size:13px;color:rgba(60,80,60,.6);margin:4px 0;letter-spacing:.08em}
+    .stat b{color:rgba(40,60,40,.85)}
+    #split-line{position:fixed;left:50%;top:0;width:2px;height:100%;background:rgba(80,100,80,.15);z-index:55;display:none;pointer-events:none}
+    .player-label{font-size:8px;letter-spacing:.15em;text-transform:uppercase;opacity:.4;margin-bottom:2px}
+  </style>
+</head>
+<body>
+  <canvas id="topo"></canvas>
+  <canvas id="car-canvas"></canvas>
+  <div id="split-line"></div>
+  <div id="countdown"></div>
+
+  <div id="overlay">
+    <h1>Off-Road</h1>
+    <p class="subtitle">Reach the lake &middot; protect the terrain</p>
+
+    <div class="mode-row">
+      <button class="btn mode-btn active" data-mode="solo">Solo</button>
+      <button class="btn mode-btn" data-mode="together">Together</button>
+    </div>
+
+    <div id="together-panel">
+      <div id="host-section">
+        <p>Share this link with a friend:</p>
+        <input id="session-link" readonly onclick="this.select()">
+      </div>
+      <div id="peer-status" class="waiting">Waiting for player 2&hellip;</div>
+    </div>
+
+    <button class="settings-toggle" id="settings-toggle">&#9881; Appearance</button>
+    <div id="settings-panel">
+      <button class="btn time-btn active" data-time="day">Day</button>
+      <button class="btn time-btn" data-time="sunset">Sunset</button>
+      <button class="btn time-btn" data-time="bluehour">Blue Hour</button>
+      <button class="btn time-btn" data-time="night">Night</button>
+    </div>
+
+    <button class="btn drive-btn" id="drive-btn">Drive</button>
+  </div>
+
+  <div id="hud-left">
+    <div class="hud-title">Off-Road Topology</div>
+    <div class="player-label" id="p1-label" style="display:none">Player 1</div>
+    <div><span>SPEED</span> <span class="hud-val" id="h-speed-0">0</span></div>
+    <div><span>TERRAIN</span> <span class="hud-val" id="h-terrain-0">ROAD</span></div>
+    <div><span>DAMAGE</span> <span class="hud-val" id="h-damage-0">0%</span></div>
+    <div><span>DISTANCE</span> <span class="hud-val" id="h-dist-0">0%</span></div>
+  </div>
+  <div id="hud-right">
+    <div class="player-label">Player 2</div>
+    <div><span>SPEED</span> <span class="hud-val" id="h-speed-1">0</span></div>
+    <div><span>TERRAIN</span> <span class="hud-val" id="h-terrain-1">ROAD</span></div>
+    <div><span>DAMAGE</span> <span class="hud-val" id="h-damage-1">0%</span></div>
+    <div><span>DISTANCE</span> <span class="hud-val" id="h-dist-1">0%</span></div>
+  </div>
+  <div id="timer">00:00.0</div>
+  <div id="offroad-flash"></div>
+  <div id="map-label">Continental Range<br>1 : 50 000</div>
+  <div id="controls-hint">A/D steer &middot; W/S speed</div>
+
+  <div id="finish-screen">
+    <h2 id="finish-title">Lake Reached!</h2>
+    <div id="finish-stats"></div>
+    <button class="btn" id="restart-btn" style="margin-top:30px">Drive Again</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="importmap">
+  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js"}}
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    // ─── Themes ──────────────────────────────────────────
+    const THEMES={
+      day:{bg:'#eae6d8',fillAlpha:.32,cAlpha:[.35,.65],cCol:[[145,125,95],[105,80,50]],glow:[180,90,30],
+        roadEdge:'rgba(120,100,75,.45)',roadDash:'rgba(140,120,90,.3)',roadFill:'rgba(160,145,115,.18)',
+        fm:'rgba(110,80,50,.45)',ff:'rgba(50,105,40,.25)',ft:'rgba(90,70,50,.35)',fe:'rgba(130,100,65,.28)',
+        grid:.05,lb:[[140,180,210,.28],[100,160,200,.35],[75,140,185,.28]],ls:'rgba(55,110,150,.45)',
+        tf:['rgba(35,85,30,.38)','rgba(50,100,40,.25)'],
+        pal:[[200,195,170],[185,185,160],[168,180,148],[142,168,128],[118,152,102],[95,135,80],[78,115,68],[92,105,92],[125,118,112],[148,142,138],[162,160,158]],
+        aL:.7,dL:1,dC:0xfff8f0,hud:'rgba(50,70,50,.8)',timer:'rgba(50,70,50,.7)'},
+      sunset:{bg:'#f0dcc8',fillAlpha:.38,cAlpha:[.3,.6],cCol:[[160,100,60],[120,65,35]],glow:[210,100,40],
+        roadEdge:'rgba(140,90,60,.45)',roadDash:'rgba(160,110,70,.3)',roadFill:'rgba(170,135,95,.2)',
+        fm:'rgba(140,70,35,.5)',ff:'rgba(70,95,30,.3)',ft:'rgba(120,70,40,.4)',fe:'rgba(150,95,55,.3)',
+        grid:.04,lb:[[190,150,130,.25],[170,120,100,.3],[150,100,85,.25]],ls:'rgba(140,90,70,.4)',
+        tf:['rgba(50,70,25,.4)','rgba(65,80,30,.28)'],
+        pal:[[215,190,155],[200,175,140],[185,165,125],[165,145,105],[148,128,88],[128,110,72],[108,92,60],[110,95,80],[140,118,100],[160,140,125],[175,158,145]],
+        aL:.5,dL:1.2,dC:0xffaa55,hud:'rgba(80,50,30,.8)',timer:'rgba(80,50,30,.7)'},
+      bluehour:{bg:'#c8d0de',fillAlpha:.35,cAlpha:[.3,.55],cCol:[[90,100,130],[60,70,110]],glow:[120,100,180],
+        roadEdge:'rgba(80,90,120,.45)',roadDash:'rgba(90,100,130,.28)',roadFill:'rgba(130,125,150,.16)',
+        fm:'rgba(70,75,110,.45)',ff:'rgba(40,75,70,.3)',ft:'rgba(70,70,100,.35)',fe:'rgba(80,85,120,.28)',
+        grid:.04,lb:[[110,130,170,.3],[85,110,155,.35],[65,90,140,.28]],ls:'rgba(55,75,130,.45)',
+        tf:['rgba(30,55,55,.4)','rgba(40,65,60,.28)'],
+        pal:[[170,175,190],[155,162,180],[138,148,170],[120,132,158],[105,118,148],[88,102,135],[75,88,120],[82,85,105],[108,105,118],[130,125,135],[148,145,152]],
+        aL:.4,dL:.6,dC:0x8899cc,hud:'rgba(40,50,80,.8)',timer:'rgba(40,50,80,.7)'},
+      night:{bg:'#1a1e28',fillAlpha:.4,cAlpha:[.2,.45],cCol:[[60,70,95],[35,45,75]],glow:[80,70,140],
+        roadEdge:'rgba(50,55,80,.5)',roadDash:'rgba(55,60,85,.3)',roadFill:'rgba(55,52,70,.2)',
+        fm:'rgba(50,55,80,.5)',ff:'rgba(25,50,45,.35)',ft:'rgba(70,65,55,.4)',fe:'rgba(55,60,85,.3)',
+        grid:.03,lb:[[40,55,85,.35],[30,45,75,.4],[22,35,65,.32]],ls:'rgba(35,50,80,.5)',
+        tf:['rgba(15,30,25,.45)','rgba(22,38,30,.32)'],
+        pal:[[50,55,68],[45,50,65],[40,48,62],[35,45,58],[32,42,55],[28,38,50],[25,35,48],[30,32,42],[42,40,48],[52,50,55],[60,58,62]],
+        aL:.15,dL:.3,dC:0x4455aa,hud:'rgba(120,130,170,.8)',timer:'rgba(120,130,170,.7)'}
+    };
+    let T=THEMES.day;
+
+    // ─── Config ──────────────────────────────────────────
+    const COLS=90,ROWS=65,LEVELS=10;
+    const ROAD_BASE=.5,ROAD_HALF_W=.032;
+    const CATAPULT_TH=.5,CATAPULT_F=2.5,FINISH_DIST=6;
+    const CAR_COLORS=[0x2d5a27,0xb85c2e];
+    const TILT_SCALE=.15; // subtle terrain tilt
+
+    function getRoadX(s){return ROAD_BASE+Math.sin(s*.6)*.1+Math.sin(s*1.4+1.5)*.06+Math.sin(s*2.8+3)*.03}
+
+    // ─── Seeded PRNG ────────────────────────────────────
+    let _seed=Date.now()^(Math.random()*0xffffffff);
+    function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+    let rng=mulberry32(_seed);
+    function seedRng(s){_seed=s;rng=mulberry32(s)}
+    // seeded random that replaces Math.random() for terrain generation
+    function srand(){return rng()}
+
+    // ─── Multiplayer state ──────────────────────────────
+    let multiplayer=false,isHost=true,peer=null,conn=null,peerReady=false;
+    let remoteCarState=null,remoteScroll=null;
+    const urlParams=new URLSearchParams(location.search);
+    const joinId=urlParams.get('join');
+    const urlSeed=urlParams.get('seed');
+    if(urlSeed)seedRng(parseInt(urlSeed,36));
+    let localIdx=0; // which car index this client controls
+
+    // ─── DOM ─────────────────────────────────────────────
+    const topoCanvas=document.getElementById('topo'),topoCtx=topoCanvas.getContext('2d');
+    const carCanvas=document.getElementById('car-canvas');
+    const overlay=document.getElementById('overlay');
+    const offroadFlash=document.getElementById('offroad-flash');
+    const timerEl=document.getElementById('timer');
+    const finishScreen=document.getElementById('finish-screen');
+    const splitLine=document.getElementById('split-line');
+    const countdownEl=document.getElementById('countdown');
+    const driveBtn=document.getElementById('drive-btn');
+    const togetherPanel=document.getElementById('together-panel');
+    const peerStatus=document.getElementById('peer-status');
+    const sessionLinkEl=document.getElementById('session-link');
+
+    // Settings toggle
+    document.getElementById('settings-toggle').addEventListener('click',e=>{
+      e.stopPropagation();
+      document.getElementById('settings-panel').classList.toggle('open');
+    });
+
+    document.querySelectorAll('.time-btn').forEach(b=>b.addEventListener('click',e=>{
+      e.stopPropagation();
+      document.querySelectorAll('.time-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');T=THEMES[b.dataset.time];
+      document.body.style.background=T.bg;
+      ambLight.intensity=T.aL;dLight.intensity=T.dL;dLight.color.set(T.dC);
+    }));
+
+    // Mode buttons
+    document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',e=>{
+      e.stopPropagation();
+      document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      const mode=b.dataset.mode;
+      if(mode==='together'){
+        multiplayer=true;
+        togetherPanel.style.display='block';
+        if(!joinId)setupHost();
+      }else{
+        multiplayer=false;
+        togetherPanel.style.display='none';
+        driveBtn.disabled=false;
+        if(peer){peer.destroy();peer=null;conn=null}
+      }
+    }));
+
+    let W,H;
+    function resize(){W=innerWidth;H=innerHeight;topoCanvas.width=W;topoCanvas.height=H;carCanvas.width=W;carCanvas.height=H}
+    resize();addEventListener('resize',resize);
+
+    // ─── PeerJS Multiplayer ─────────────────────────────
+    function setupHost(){
+      isHost=true;localIdx=0;
+      driveBtn.disabled=true;
+      peer=new window.Peer();
+      peer.on('open',id=>{
+        const link=location.origin+location.pathname+'?join='+id+'&seed='+_seed.toString(36);
+        sessionLinkEl.value=link;
+        peerStatus.textContent='Waiting for player 2\u2026';
+        peerStatus.className='waiting';
+      });
+      peer.on('connection',c=>{
+        conn=c;peerReady=true;
+        peerStatus.textContent='Player 2 connected \u2713';
+        peerStatus.className='connected';
+        driveBtn.disabled=false;
+        // Send seed so guest can rebuild identical terrain
+        conn.on('open',()=>{conn.send({t:'seed',v:_seed})});
+        conn.on('data',onPeerData);
+        conn.on('close',()=>{peerReady=false;peerStatus.textContent='Player 2 disconnected';peerStatus.className=''});
+      });
+      peer.on('error',err=>{peerStatus.textContent='Connection error: '+err.type;peerStatus.className=''});
+    }
+
+    function setupGuest(hostId){
+      isHost=false;localIdx=1;multiplayer=true;
+      driveBtn.disabled=true;
+      document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));
+      document.querySelector('[data-mode="together"]').classList.add('active');
+      togetherPanel.style.display='block';
+      document.getElementById('host-section').style.display='none';
+      peerStatus.textContent='Connecting\u2026';peerStatus.className='waiting';
+
+      peer=new window.Peer();
+      peer.on('open',()=>{
+        conn=peer.connect(hostId,{reliable:true});
+        conn.on('open',()=>{
+          peerReady=true;
+          peerStatus.textContent='Connected to host \u2713';peerStatus.className='connected';
+          driveBtn.disabled=false;
+          conn.on('data',onPeerData);
+        });
+        conn.on('close',()=>{peerReady=false;peerStatus.textContent='Disconnected';peerStatus.className=''});
+      });
+      peer.on('error',err=>{peerStatus.textContent='Connection error: '+err.type;peerStatus.className=''});
+    }
+
+    function rebuildTerrain(s){
+      seedRng(s);initPerm();initFeatures();
+      // Lake shape depends on fbm which uses perm, so recalculate
+      for(let i=0;i<LP;i++)lkS[i]=.7+fbm(Math.cos(i/LP*Math.PI*2)*2+50,Math.sin(i/LP*Math.PI*2)*2+50)*.6;
+    }
+
+    function onPeerData(data){
+      if(data.t==='car')remoteCarState=data;
+      if(data.t==='scroll')remoteScroll=data.v;
+      if(data.t==='seed')rebuildTerrain(data.v);
+      if(data.t==='start')beginGame();
+      if(data.t==='countdown')runCountdown();
+    }
+
+    function sendCarState(c){
+      if(!conn||!conn.open)return;
+      conn.send({t:'car',nx:c.nx,ny:c.ny,speed:c.speed,lateralSpeed:c.lateralSpeed,
+        heading:c.heading,warp:c.warp,isOffRoad:c.isOffRoad,damage:c.damage,
+        finished:c.finished,parkPhase:c.parkPhase});
+    }
+    function sendScroll(v){if(conn&&conn.open&&isHost)conn.send({t:'scroll',v})}
+    let sendTimer=0;
+
+    if(joinId)setupGuest(joinId);
+
+    // ─── Noise ───────────────────────────────────────────
+    const perm=new Uint8Array(512);
+    function initPerm(){
+      const p=new Uint8Array(256);for(let i=0;i<256;i++)p[i]=i;
+      for(let i=255;i>0;i--){const j=srand()*i|0;[p[i],p[j]]=[p[j],p[i]]}
+      for(let i=0;i<512;i++)perm[i]=p[i&255];
+    }
+    initPerm();
+    const fade=t=>t*t*t*(t*(t*6-15)+10),lerp=(a,b,t)=>a+t*(b-a);
+    function grad(h,x,y){return((h&1)?-x:x)+((h&2)?-y:y)}
+    function noise2d(x,y){
+      const X=Math.floor(x)&255,Y=Math.floor(y)&255,xf=x-Math.floor(x),yf=y-Math.floor(y),u=fade(xf),v=fade(yf);
+      return lerp(lerp(grad(perm[perm[X]+Y],xf,yf),grad(perm[perm[X+1]+Y],xf-1,yf),u),
+                  lerp(grad(perm[perm[X]+Y+1],xf,yf-1),grad(perm[perm[X+1]+Y+1],xf-1,yf-1),u),v);
+    }
+    function fbm(x,y){let v=0,a=.5,f=1;for(let i=0;i<5;i++){v+=a*noise2d(x*f,y*f);a*=.5;f*=2}return v*.5+.5}
+
+    // ─── Marching Squares ────────────────────────────────
+    const SEG=[[],[[3,0]],[[0,1]],[[3,1]],[[1,2]],[[1,0],[3,2]],[[0,2]],[[3,2]],[[2,3]],[[2,0]],[[0,1],[2,3]],[[2,1]],[[1,3]],[[1,0]],[[0,3]],[]];
+    function iEdge(e,x,y,cw,ch,v00,v10,v01,v11,iso){
+      let t;switch(e){
+        case 0:t=(iso-v00)/(v10-v00);return[x+t*cw,y];
+        case 1:t=(iso-v10)/(v11-v10);return[x+cw,y+t*ch];
+        case 2:t=(iso-v01)/(v11-v01);return[x+t*cw,y+ch];
+        case 3:t=(iso-v00)/(v01-v00);return[x,y+t*ch];
+      }
+    }
+
+    // ─── Field ───────────────────────────────────────────
+    const field=new Float32Array((COLS+1)*(ROWS+1));
+    const trails=[];
+
+    function buildField(cars,scrollOff){
+      for(const c of cars){
+        if(c.warp>.05){trails.push({x:c.screenNX,y:c.screenNY,warp:c.warp,age:0,sAt:scrollOff});if(trails.length>60)trails.shift()}
+      }
+      for(const t of trails)t.age+=.016;
+      while(trails.length&&trails[0].age>1.5)trails.shift();
+
+      for(let j=0;j<=ROWS;j++){
+        for(let i=0;i<=COLS;i++){
+          const nx=i/COLS,ny=j/ROWS,sY=ny-scrollOff*5;
+          let v=fbm(nx*4+10,sY*3+10);
+          v+=(Math.exp(-((nx-.15)**2)/.01)*.3+Math.exp(-((nx-.85)**2)/.01)*.3)*(.5+.5*Math.sin(sY*4));
+          v+=fbm(nx*8+30,sY*5+30)*.12;
+          const lrx=getRoadX(sY);v-=Math.exp(-((nx-lrx)**2)/.005)*.28;
+
+          for(const c of cars){
+            const dx=nx-c.screenNX,dy=ny-c.screenNY,d=Math.sqrt(dx*dx+dy*dy);
+            if(d<.08)v-=((1-d/.08)**2*(3-2*(1-d/.08)))*.08;
+            if(c.warp>.02){
+              const oR=.06+c.warp*.18;
+              if(d<oR){const s=((1-d/oR)**2)*(3-2*(1-d/oR));v+=s*c.warp*.7*Math.sin(d*(40+c.warp*30));v+=s*c.warp*.4;v+=s*c.warp*.2*Math.sin(d*80-scrollOff*5)}
+            }
+          }
+          for(const tp of trails){
+            const tdx=nx-tp.x,tdy=ny-(tp.y-(scrollOff-tp.sAt)*5),td=Math.sqrt(tdx*tdx+tdy*tdy);
+            if(td<.05)v+=((1-td/.05)**2)*tp.warp*.25*Math.max(0,1-tp.age*.8)*Math.sin(td*50);
+          }
+          field[j*(COLS+1)+i]=v;
+        }
+      }
+    }
+
+    function sampleField(nx,ny){
+      const fi=Math.max(0,Math.min(COLS,nx*COLS)),fj=Math.max(0,Math.min(ROWS,ny*ROWS));
+      const i=Math.floor(fi),j=Math.floor(fj),fx=fi-i,fy=fj-j;
+      const ci=Math.min(i,COLS-1),cj=Math.min(j,ROWS-1);
+      const v00=field[cj*(COLS+1)+ci],v10=field[cj*(COLS+1)+ci+1];
+      const v01=field[(cj+1)*(COLS+1)+ci],v11=field[(cj+1)*(COLS+1)+ci+1];
+      return lerp(lerp(v00,v10,fx),lerp(v01,v11,fx),fy);
+    }
+
+    // ─── Draw functions ──────────────────────────────────
+    function drawFills(){
+      const cw=W/COLS,ch=H/ROWS,P=T.pal;
+      for(let j=0;j<ROWS;j++)for(let i=0;i<COLS;i++){
+        const avg=(field[j*(COLS+1)+i]+field[j*(COLS+1)+i+1]+field[(j+1)*(COLS+1)+i]+field[(j+1)*(COLS+1)+i+1])/4;
+        const t=Math.max(0,Math.min(1,(avg-.12)/.72)),idx=t*(P.length-1),lo=idx|0,hi=Math.min(P.length-1,lo+1),f=idx-lo;
+        topoCtx.fillStyle=`rgba(${lerp(P[lo][0],P[hi][0],f)|0},${lerp(P[lo][1],P[hi][1],f)|0},${lerp(P[lo][2],P[hi][2],f)|0},${T.fillAlpha})`;
+        topoCtx.fillRect(i*cw,j*ch,cw+.5,ch+.5);
+      }
+    }
+
+    function drawContours(cars){
+      const cw=W/COLS,ch=H/ROWS;
+      for(let lv=0;lv<LEVELS;lv++){
+        const t=lv/LEVELS,iso=.12+t*.72;
+        const cc=T.cCol,r=lerp(cc[0][0],cc[1][0],t)|0,g=lerp(cc[0][1],cc[1][1],t)|0,b=lerp(cc[0][2],cc[1][2],t)|0;
+        topoCtx.strokeStyle=`rgba(${r},${g},${b},${lerp(T.cAlpha[0],T.cAlpha[1],t)})`;
+        topoCtx.lineWidth=lv%4===0?1.1:.55;topoCtx.beginPath();
+        for(let j=0;j<ROWS;j++)for(let i=0;i<COLS;i++){
+          const v00=field[j*(COLS+1)+i],v10=field[j*(COLS+1)+i+1],v01=field[(j+1)*(COLS+1)+i],v11=field[(j+1)*(COLS+1)+i+1];
+          let idx=0;if(v00>=iso)idx|=1;if(v10>=iso)idx|=2;if(v11>=iso)idx|=4;if(v01>=iso)idx|=8;
+          const segs=SEG[idx];if(!segs||!segs.length)continue;
+          const x=i*cw,y=j*ch;
+          for(const[e1,e2]of segs){const p1=iEdge(e1,x,y,cw,ch,v00,v10,v01,v11,iso),p2=iEdge(e2,x,y,cw,ch,v00,v10,v01,v11,iso);if(p1&&p2){topoCtx.moveTo(p1[0],p1[1]);topoCtx.lineTo(p2[0],p2[1])}}
+        }
+        topoCtx.stroke();
+
+        for(const c of cars){
+          if(c.warp<.02)continue;
+          const glR=.1+c.warp*.15,gc=T.glow;
+          topoCtx.strokeStyle=`rgba(${gc[0]},${gc[1]},${gc[2]},${Math.min(.6,c.warp*.5)*(.4+t*.6)})`;
+          topoCtx.lineWidth=1+c.warp*1.5;topoCtx.beginPath();
+          for(let j=0;j<ROWS;j++)for(let i=0;i<COLS;i++){
+            if(Math.sqrt(((i+.5)/COLS-c.screenNX)**2+((j+.5)/ROWS-c.screenNY)**2)>glR)continue;
+            const v00=field[j*(COLS+1)+i],v10=field[j*(COLS+1)+i+1],v01=field[(j+1)*(COLS+1)+i],v11=field[(j+1)*(COLS+1)+i+1];
+            let idx=0;if(v00>=iso)idx|=1;if(v10>=iso)idx|=2;if(v11>=iso)idx|=4;if(v01>=iso)idx|=8;
+            const segs=SEG[idx];if(!segs||!segs.length)continue;
+            const x=i*(W/COLS),y=j*(H/ROWS);
+            for(const[e1,e2]of segs){const p1=iEdge(e1,x,y,cw,ch,v00,v10,v01,v11,iso),p2=iEdge(e2,x,y,cw,ch,v00,v10,v01,v11,iso);if(p1&&p2){topoCtx.moveTo(p1[0],p1[1]);topoCtx.lineTo(p2[0],p2[1])}}
+          }
+          topoCtx.stroke();
+        }
+      }
+    }
+
+    function drawRoad(sOff){
+      const hw=ROAD_HALF_W*W*1.15,st=120;
+      // Helper: compute janky edge x at a given step
+      function edgeX(i,side){
+        const ny=i/st,sY=ny-sOff*5,rx=getRoadX(sY)*W+side*hw;
+        return rx+noise2d(sY*8+side*100,42)*3.5+noise2d(sY*20+side*50,17)*1.5;
+      }
+      // Road surface fill — darker beige
+      topoCtx.fillStyle=T.roadFill;
+      topoCtx.beginPath();
+      for(let i=0;i<=st;i++){const x=edgeX(i,-1),ny=i/st;i===0?topoCtx.moveTo(x,ny*H):topoCtx.lineTo(x,ny*H)}
+      for(let i=st;i>=0;i--){const x=edgeX(i,1),ny=i/st;topoCtx.lineTo(x,ny*H)}
+      topoCtx.closePath();topoCtx.fill();
+      // Janky road edges
+      for(const side of[-1,1]){
+        topoCtx.strokeStyle=T.roadEdge;topoCtx.lineWidth=1.3;topoCtx.beginPath();
+        for(let i=0;i<=st;i++){const x=edgeX(i,side),ny=i/st;i===0?topoCtx.moveTo(x,ny*H):topoCtx.lineTo(x,ny*H)}
+        topoCtx.stroke();
+      }
+      // Subtle inner edge (lighter, more janky)
+      for(const side of[-1,1]){
+        topoCtx.strokeStyle=T.roadEdge.replace(/[\d.]+\)$/,'.15)');topoCtx.lineWidth=.6;topoCtx.beginPath();
+        for(let i=0;i<=st;i++){
+          const ny=i/st,sY=ny-sOff*5,rx=getRoadX(sY)*W+side*hw*.7;
+          const jank=noise2d(sY*12+side*80+5,30)*2;
+          i===0?topoCtx.moveTo(rx+jank,ny*H):topoCtx.lineTo(rx+jank,ny*H);
+        }
+        topoCtx.stroke();
+      }
+      // Center dash
+      topoCtx.setLineDash([6,14]);topoCtx.strokeStyle=T.roadDash;topoCtx.lineWidth=.7;topoCtx.beginPath();
+      for(let i=0;i<=st;i++){const ny=i/st,rx=getRoadX(ny-sOff*5)*W;i===0?topoCtx.moveTo(rx,ny*H):topoCtx.lineTo(rx,ny*H)}
+      topoCtx.stroke();topoCtx.setLineDash([]);
+    }
+
+    function drawGrid(){
+      topoCtx.strokeStyle=`rgba(120,100,80,${T.grid})`;topoCtx.lineWidth=.5;
+      for(let i=0;i<=10;i++){const x=i/10*W;topoCtx.beginPath();topoCtx.moveTo(x,0);topoCtx.lineTo(x,H);topoCtx.stroke();const y=i/10*H;topoCtx.beginPath();topoCtx.moveTo(0,y);topoCtx.lineTo(W,y);topoCtx.stroke()}
+    }
+
+    let features=[];
+    function initFeatures(){
+      features=[];
+      for(let i=0;i<100;i++){const fx=srand(),fy=srand()*10;if(Math.abs(fx-getRoadX(fy*2))<ROAD_HALF_W+.06)continue;const t=srand();
+        if(t<.3)features.push({x:fx,y:fy,t:'m',n:`${(srand()*2000+800).toFixed(0)}m`,s:3+srand()*3});
+        else if(t<.7)features.push({x:fx,y:fy,t:'f',c:3+(srand()*4|0),s:2.5+srand()*1.5});
+        else if(t<.85)features.push({x:fx,y:fy,t:'t',n:['Ridgeview','Pine Hollow','Cedar Falls','Stonebrook','Elk Meadow','Fern Valley','Hawk Ridge'][srand()*7|0]});
+        else features.push({x:fx,y:fy,t:'e',v:`${(srand()*1500+200).toFixed(0)}`})}
+    }
+    initFeatures();
+
+    function drawFeatures(sOff){
+      const sp=-sOff*H*5,wH=H*2+200;
+      for(const f of features){const sx=f.x*W,sy=((f.y*H*5)-sp)%wH-100;if(sy<-20||sy>H+20)continue;
+        if(f.t==='m'){topoCtx.strokeStyle=T.fm;topoCtx.lineWidth=.9;topoCtx.beginPath();topoCtx.moveTo(sx,sy-f.s);topoCtx.lineTo(sx-f.s*.7,sy+f.s*.4);topoCtx.lineTo(sx+f.s*.7,sy+f.s*.4);topoCtx.closePath();topoCtx.stroke();topoCtx.font='6px monospace';topoCtx.fillStyle=T.fm;topoCtx.textAlign='left';topoCtx.fillText(f.n,sx+f.s+2,sy-f.s+3)}
+        else if(f.t==='f'){topoCtx.fillStyle=T.ff;for(let i=0;i<f.c;i++){const tx=sx+Math.sin(i*2.3)*f.s*2,ty=sy+Math.cos(i*1.7)*f.s*1.5,ts=f.s*.5;topoCtx.beginPath();topoCtx.moveTo(tx,ty-ts);topoCtx.lineTo(tx-ts*.5,ty);topoCtx.lineTo(tx+ts*.5,ty);topoCtx.closePath();topoCtx.fill()}}
+        else if(f.t==='t'){topoCtx.fillStyle=T.ft;topoCtx.fillRect(sx-1.5,sy-1.5,3,3);topoCtx.font='7px sans-serif';topoCtx.textAlign='left';topoCtx.fillText(f.n,sx+4,sy+2)}
+        else{topoCtx.font='6px monospace';topoCtx.fillStyle=T.fe;topoCtx.textAlign='center';topoCtx.fillText(f.v,sx,sy)}}
+    }
+
+    // Lake
+    const LWY=.14-FINISH_DIST,LSY=LWY*5,LCX=getRoadX(LSY)+.12,LR=80,LP=64;
+    const lkS=[];for(let i=0;i<LP;i++)lkS.push(.7+fbm(Math.cos(i/LP*Math.PI*2)*2+50,Math.sin(i/LP*Math.PI*2)*2+50)*.6);
+    function lkR(a){const idx=((a/(Math.PI*2))%1+1)%1*LP,lo=idx|0,hi=(lo+1)%LP;return lerp(lkS[lo],lkS[hi],idx-(idx|0))}
+    function lkPath(cx,cy,r,s){topoCtx.beginPath();for(let i=0;i<=LP;i++){const a=i/LP*Math.PI*2,x=cx+Math.cos(a)*lkR(a)*r*s,y=cy+Math.sin(a)*lkR(a)*r*s*.75;i===0?topoCtx.moveTo(x,y):topoCtx.lineTo(x,y)}topoCtx.closePath()}
+    function drawLake(sOff){
+      const ly=(LWY+sOff)*H*5;if(ly<-280||ly>H+280)return;
+      const lx=LCX*W,now=performance.now()*.001;
+      for(let ring=0;ring<2;ring++){const cnt=24+ring*10;for(let i=0;i<cnt;i++){const a=i/cnt*Math.PI*2+ring*.2,br=lkR(a)*LR*(1.25+ring*.18)+Math.sin(a*4.7+ring)*5+15;
+        const tx=lx+Math.cos(a)*br,ty=ly+Math.sin(a)*br*.75,ts=4.5+Math.sin(a*3.1+ring)*1.5;
+        topoCtx.fillStyle=T.tf[ring];topoCtx.beginPath();topoCtx.moveTo(tx,ty-ts);topoCtx.lineTo(tx-ts*.5,ty+ts*.2);topoCtx.lineTo(tx+ts*.5,ty+ts*.2);topoCtx.closePath();topoCtx.fill();
+        topoCtx.beginPath();topoCtx.moveTo(tx,ty-ts*.55);topoCtx.lineTo(tx-ts*.35,ty);topoCtx.lineTo(tx+ts*.35,ty);topoCtx.closePath();topoCtx.fill()}}
+      for(let c=4;c>=0;c--){topoCtx.strokeStyle=T.ls.replace(/[\d.]+\)$/,(.06+c*.02)+')');topoCtx.lineWidth=c===0?.9:.4;lkPath(lx,ly,LR,1.35+c*.06);topoCtx.stroke()}
+      const lb=T.lb;for(let l=0;l<lb.length;l++){topoCtx.fillStyle=`rgba(${lb[l][0]},${lb[l][1]},${lb[l][2]},${lb[l][3]})`;lkPath(lx,ly,LR,[1.1,.9,.6][l]);topoCtx.fill()}
+      for(let r=0;r<3;r++){const ph=(now*.3+r*2)%3;topoCtx.strokeStyle=T.ls.replace(/[\d.]+\)$/,Math.max(0,.1-ph*.033)+')');topoCtx.lineWidth=.5;topoCtx.save();topoCtx.translate(Math.sin(r*1.5+now*.2)*10,Math.cos(r*2.1+now*.15)*6);lkPath(lx,ly,LR,.25+ph*.2);topoCtx.stroke();topoCtx.restore()}
+      topoCtx.strokeStyle=T.ls;topoCtx.lineWidth=1.2;lkPath(lx,ly,LR,1.1);topoCtx.stroke();
+      topoCtx.font='italic 11px serif';topoCtx.fillStyle=T.ls;topoCtx.textAlign='center';topoCtx.fillText('Mirror Lake',lx,ly+LR*.8+22);
+    }
+
+    // ─── 3D Setup ────────────────────────────────────────
+    const renderer=new THREE.WebGLRenderer({canvas:carCanvas,alpha:true,antialias:true});
+    renderer.setSize(W,H);renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0,0);
+    const scene3d=new THREE.Scene();
+    const cam3d=new THREE.OrthographicCamera(-1,1,1,-1,.1,100);cam3d.position.set(0,8,2);cam3d.lookAt(0,0,0);
+    const ambLight=new THREE.AmbientLight(0xffffff,T.aL);scene3d.add(ambLight);
+    const dLight=new THREE.DirectionalLight(T.dC,T.dL);dLight.position.set(3,8,4);scene3d.add(dLight);
+
+    function buildCarMesh(color){
+      const g=new THREE.Group();
+      const m=new THREE.MeshStandardMaterial({color,roughness:.45,metalness:.15});
+      const body=new THREE.Mesh(new THREE.BoxGeometry(1.8,.65,3.2),m);body.position.y=.55;g.add(body);
+      const hood=new THREE.Mesh(new THREE.BoxGeometry(1.5,.1,.6),m);hood.position.set(0,.95,-1.35);hood.rotation.x=.1;g.add(hood);
+      const cab=new THREE.Mesh(new THREE.BoxGeometry(1.4,.55,1.5),new THREE.MeshStandardMaterial({color:new THREE.Color(color).multiplyScalar(.7),roughness:.15,metalness:.3,transparent:true,opacity:.5}));cab.position.set(0,1.15,.05);g.add(cab);
+      const roof=new THREE.Mesh(new THREE.BoxGeometry(1.5,.05,1.7),new THREE.MeshStandardMaterial({color:new THREE.Color(color).multiplyScalar(.85),roughness:.5}));roof.position.set(0,1.46,.05);g.add(roof);
+      const rm=new THREE.MeshStandardMaterial({color:0x333,roughness:.7,metalness:.5});
+      for(let i=-1;i<=1;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(1.6,.03,.04),rm);b.position.set(0,1.5,.05+i*.4);g.add(b)}
+      const wm=new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:.9});
+      [[-0.9,.28,1],[.9,.28,1],[-.9,.28,-1],[.9,.28,-1]].forEach(([x,y,z])=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,.18,10),wm);w.position.set(x,y,z);w.rotation.z=Math.PI/2;g.add(w)});
+      const bm=new THREE.MeshStandardMaterial({color:0x333,roughness:.8});
+      [[-1.65],[1.65]].forEach(([z])=>{const b=new THREE.Mesh(new THREE.BoxGeometry(1.9,.15,.1),bm);b.position.set(0,.35,z);g.add(b)});
+      const hl=new THREE.MeshStandardMaterial({color:0xffffdd,emissive:0xffffaa,emissiveIntensity:.5});
+      [[-0.5,.55,-1.62],[.5,.55,-1.62]].forEach(([x,y,z])=>{const h=new THREE.Mesh(new THREE.CircleGeometry(.07,6),hl);h.position.set(x,y,z);h.rotation.y=Math.PI;g.add(h)});
+      const tl=new THREE.MeshStandardMaterial({color:0xcc2200,emissive:0xaa1100,emissiveIntensity:.3});
+      [[-0.5,.55,1.62],[.5,.55,1.62]].forEach(([x,y,z])=>{const t=new THREE.Mesh(new THREE.CircleGeometry(.07,6),tl);t.position.set(x,y,z);g.add(t)});
+      return g;
+    }
+
+    const carGroups=[buildCarMesh(CAR_COLORS[0]),buildCarMesh(CAR_COLORS[1])];
+    carGroups.forEach(g=>scene3d.add(g));
+    carGroups[0].visible=false;carGroups[1].visible=false;
+
+    const oSize=8;
+    function updateOrtho(){const a=W/H;cam3d.left=-oSize*a;cam3d.right=oSize*a;cam3d.top=oSize;cam3d.bottom=-oSize;cam3d.updateProjectionMatrix();renderer.setSize(W,H)}
+    updateOrtho();addEventListener('resize',()=>{resize();updateOrtho()});
+
+    // ─── Audio ───────────────────────────────────────────
+    let audioCtx,masterGain,droneOsc,droneGain,lfoOsc,lfoGain,engineOsc,engineGain,rumbleOsc,rumbleGain,distortion,gravelNode,gravelGain,gravelFilter,birdGain,nextBird=0;
+    function mkDist(a){const n=44100,c=new Float32Array(n);for(let i=0;i<n;i++){const x=(i*2)/n-1;c[i]=((3+a)*x*20*(Math.PI/180))/(Math.PI+a*Math.abs(x))}return c}
+    function mkGravel(ctx){const sr=ctx.sampleRate,len=sr*2,buf=ctx.createBuffer(1,len,sr),d=buf.getChannelData(0);for(let i=0;i<len;i++){let v=Math.random()*2-1;if(Math.random()<.02)v*=3;v*=.5+.5*Math.sin(i/sr*25+Math.sin(i/sr*7)*2);d[i]=v*.4}return buf}
+    function chirp(){if(!audioCtx||audioCtx.state!=='running')return;const now=audioCtx.currentTime;if(now<nextBird)return;nextBird=now+2+Math.random()*6;
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();o.type='sine';f.type='bandpass';f.frequency.value=2000+Math.random()*2000;f.Q.value=8;o.connect(f);f.connect(g);g.connect(birdGain);
+      const nc=2+(Math.random()*3|0),bf=1800+Math.random()*2500,st=now+Math.random()*.5;g.gain.setValueAtTime(0,st);
+      for(let n=0;n<nc;n++){const t0=st+n*(.06+Math.random()*.04),dur=.03+Math.random()*.04,fr=bf+(Math.random()-.3)*800;o.frequency.setValueAtTime(fr,t0);o.frequency.exponentialRampToValueAtTime(fr*(.8+Math.random()*.4),t0+dur);g.gain.setValueAtTime(.15+Math.random()*.15,t0);g.gain.exponentialRampToValueAtTime(.001,t0+dur)}
+      o.start(st);o.stop(st+nc*.12+.2)}
+    async function initAudio(){
+      audioCtx=new AudioContext();masterGain=audioCtx.createGain();masterGain.gain.value=.18;masterGain.connect(audioCtx.destination);
+      distortion=audioCtx.createWaveShaper();distortion.curve=mkDist(0);distortion.oversample='4x';distortion.connect(masterGain);
+      droneOsc=audioCtx.createOscillator();droneOsc.type='sine';droneOsc.frequency.value=55;droneGain=audioCtx.createGain();droneGain.gain.value=.06;droneOsc.connect(droneGain);droneGain.connect(distortion);droneOsc.start();
+      lfoOsc=audioCtx.createOscillator();lfoOsc.type='sine';lfoOsc.frequency.value=.3;lfoGain=audioCtx.createGain();lfoGain.gain.value=4;lfoOsc.connect(lfoGain);lfoGain.connect(droneOsc.frequency);lfoOsc.start();
+      engineOsc=audioCtx.createOscillator();engineOsc.type='sawtooth';engineOsc.frequency.value=80;engineGain=audioCtx.createGain();engineGain.gain.value=0;engineOsc.connect(engineGain);engineGain.connect(distortion);engineOsc.start();
+      rumbleOsc=audioCtx.createOscillator();rumbleOsc.type='triangle';rumbleOsc.frequency.value=30;rumbleGain=audioCtx.createGain();rumbleGain.gain.value=0;rumbleOsc.connect(rumbleGain);rumbleGain.connect(distortion);rumbleOsc.start();
+      const gb=mkGravel(audioCtx);gravelNode=audioCtx.createBufferSource();gravelNode.buffer=gb;gravelNode.loop=true;gravelGain=audioCtx.createGain();gravelGain.gain.value=0;gravelFilter=audioCtx.createBiquadFilter();gravelFilter.type='bandpass';gravelFilter.frequency.value=800;gravelFilter.Q.value=1.5;gravelNode.connect(gravelFilter);gravelFilter.connect(gravelGain);gravelGain.connect(masterGain);gravelNode.start();
+      birdGain=audioCtx.createGain();birdGain.gain.value=.12;birdGain.connect(masterGain)}
+    function updateAudio(spd,warp){
+      if(!audioCtx)return;const t=audioCtx.currentTime,s=Math.abs(spd);
+      engineOsc.frequency.setTargetAtTime(55+s*150,t,.1);engineGain.gain.setTargetAtTime(Math.min(.04,s*.08),t,.1);
+      lfoOsc.frequency.setTargetAtTime(.3+warp*4,t,.1);lfoGain.gain.setTargetAtTime(4+warp*30,t,.1);
+      droneGain.gain.setTargetAtTime(.04+warp*.1,t,.1);distortion.curve=mkDist(warp*80);
+      rumbleOsc.frequency.setTargetAtTime(18+warp*25,t,.1);rumbleGain.gain.setTargetAtTime(warp*.1*Math.min(1,s*5),t,.08);
+      gravelGain.gain.setTargetAtTime(Math.min(.2,s*2.5)*(1+warp*1.5),t,.08);gravelFilter.frequency.setTargetAtTime(500+s*4000+warp*1500,t,.1);chirp()}
+
+    // ─── Cars ────────────────────────────────────────────
+    function makeCar(idx){return{idx,nx:ROAD_BASE+(idx?.02:0),ny:.7,speed:0,lateralSpeed:0,heading:0,warp:0,isOffRoad:false,catVx:0,catVy:0,catting:false,catTimer:0,catTargetX:undefined,scrollOffset:0,screenNX:.5,screenNY:.7,damage:0,finished:false,parkPhase:0}}
+    let cars=[makeCar(0),makeCar(1)];
+    let gameTime=0,anyFinished=false;
+    const keys={};
+    addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k))e.preventDefault()});
+    addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+
+    // In network multiplayer, both WASD and arrows control local car
+    // In local split, P1=WASD, P2=Arrows
+    function keyDown(pIdx,action){
+      const acts=[['w','arrowup'],['s','arrowdown'],['a','arrowleft'],['d','arrowright']];
+      if(!multiplayer){
+        // Solo: both WASD and arrows
+        return acts[action].some(k=>keys[k]);
+      }
+      // Network multiplayer: only control your own car, all keys work
+      if(pIdx!==localIdx)return false;
+      return acts[action].some(k=>keys[k]);
+    }
+
+    const baseScroll=.03;
+
+    function updateCar(c,dt,sharedScroll){
+      if(c.finished&&c.parkPhase>=1){
+        c.nx+=(LCX-.08+(c.idx*.06)-c.nx)*dt*2;c.heading*=.95;c.speed*=.9;c.warp*=.9;
+        if(c.parkPhase<2){c.parkPhase+=dt*.5;if(c.parkPhase>=2&&!anyFinished){anyFinished=true;showFinish()}}
+        return;
+      }
+      if(c.finished)return;
+
+      if(keyDown(c.idx,0))c.speed+=2*dt;
+      if(keyDown(c.idx,1))c.speed-=2*dt;
+      c.speed*=.94;c.speed=Math.max(-.03,Math.min(.08,c.speed));
+
+      const prog=sharedScroll/FINISH_DIST;
+      const slow=prog>.92?Math.max(.35,1-(prog-.92)/.08*.65):1;
+      let sDelta=(baseScroll+c.speed)*dt*slow;
+      if(c.catting){sDelta+=c.catVy*dt;c.catVy*=.92}
+
+      const steer=1.2;
+      if(keyDown(c.idx,2))c.lateralSpeed-=steer*dt;
+      if(keyDown(c.idx,3))c.lateralSpeed+=steer*dt;
+      c.lateralSpeed*=.88;c.lateralSpeed=Math.max(-.4,Math.min(.4,c.lateralSpeed));
+
+      if(c.catting){c.catVy*=.92} // backward deceleration during catapult
+      c.nx+=c.lateralSpeed*dt;c.nx=Math.max(.05,Math.min(.95,c.nx));
+
+      const csyF=c.ny-sharedScroll*5,rTarget=getRoadX(csyF),rPull=(rTarget-c.nx)*.8*dt;
+      c.nx+=rPull;c.heading+=((c.lateralSpeed+rPull*2)*3-c.heading)*.1;
+
+      const csy=c.ny-sharedScroll*5,rcx=getRoadX(csy),dfr=Math.abs(c.nx-rcx);
+      c.isOffRoad=dfr>ROAD_HALF_W;
+      c.warp+=((c.isOffRoad?Math.min(1,(dfr-ROAD_HALF_W)/.12):0)-c.warp)*dt*(c.isOffRoad?5:8);
+      if(c.isOffRoad){c.damage+=c.warp*dt*8;c.lateralSpeed*=.99-c.warp*.01}
+
+      if(c.warp>CATAPULT_TH&&!c.catting&&(c.catTimer||0)<=0){
+        // Push backward + snap toward road center
+        c.catVy=-(0.02+c.warp*.03);
+        c.catting=true;c.catTimer=1.0;c.warp=.05;c.lateralSpeed=0;
+        // Immediately start moving toward road center
+        c.catTargetX=rcx; // store road center as target
+        c.catVx=0; // no lateral catapult force, use smooth recentering
+      }
+      if(c.catting&&c.catTargetX!==undefined){
+        // Smoothly re-center on road
+        c.nx+=(c.catTargetX-c.nx)*dt*4;
+        if(Math.abs(c.nx-c.catTargetX)<.005){c.catTargetX=undefined}
+      }
+      if(c.catTimer>0){c.catTimer-=dt;if(c.catTimer<=0)c.catting=false}
+
+      const lpy=(LWY+sharedScroll)*H*5;
+      if(lpy>c.ny*H-120&&lpy<c.ny*H+80&&sharedScroll>FINISH_DIST*.92){c.finished=true;c.parkPhase=1}
+
+      return sDelta;
+    }
+
+    function applyRemoteState(c,s){
+      if(!s)return;
+      c.nx=lerp(c.nx,s.nx,.3);
+      c.ny=s.ny;
+      c.speed=lerp(c.speed,s.speed,.3);
+      c.lateralSpeed=lerp(c.lateralSpeed,s.lateralSpeed,.3);
+      c.heading=lerp(c.heading,s.heading,.3);
+      c.warp=lerp(c.warp,s.warp,.3);
+      c.isOffRoad=s.isOffRoad;
+      c.damage=s.damage;
+      c.finished=s.finished;
+      c.parkPhase=s.parkPhase;
+    }
+
+    function showFinish(){
+      let html='';
+      const activeCars=multiplayer?cars:[cars[0]];
+      for(const c of activeCars){
+        const label=multiplayer?`<div style="font-weight:600;margin-top:8px">${c.idx===0?'Player 1 (Green)':'Player 2 (Orange)'}</div>`:'';
+        const m=Math.floor(gameTime/60),s=(gameTime%60).toFixed(1);
+        html+=`${label}<div class="stat">Time: <b>${String(m).padStart(2,'0')}:${s.padStart(4,'0')}</b></div>`;
+        html+=`<div class="stat">Terrain Damage: <b>${Math.min(100,c.damage).toFixed(1)}%</b></div>`;
+        const sc=gameTime+c.damage*2;
+        const r=sc<30?'Master Explorer':sc<50?'Skilled Navigator':sc<80?'Trail Finder':sc<120?'Off-Road Novice':'Terrain Wrecker';
+        html+=`<div class="stat">Rating: <b>${r}</b></div>`;
+      }
+      document.getElementById('finish-stats').innerHTML=html;
+      finishScreen.classList.add('visible');
+    }
+
+    function resetGame(){
+      cars=[makeCar(0),makeCar(1)];gameTime=0;anyFinished=false;trails.length=0;
+      finishScreen.classList.remove('visible');sharedScrollOffset=0;
+    }
+    document.getElementById('restart-btn').addEventListener('click',resetGame);
+
+    let sharedScrollOffset=0,previewScrollOffset=0;
+
+    // ─── Countdown & Start ──────────────────────────────
+    let started=false,lastTime=performance.now();
+
+    async function runCountdown(){
+      for(const txt of['3','2','1','GO']){
+        countdownEl.textContent=txt;countdownEl.classList.add('visible');
+        await new Promise(r=>setTimeout(r,800));
+        countdownEl.classList.remove('visible');
+        await new Promise(r=>setTimeout(r,200));
+      }
+      started=true;
+    }
+
+    async function beginGame(){
+      overlay.classList.add('hidden');
+      document.getElementById('hud-left').classList.add('visible');
+      if(multiplayer){
+        document.getElementById('hud-right').style.display='block';
+        document.getElementById('hud-right').classList.add('visible');
+        document.getElementById('p1-label').style.display='block';
+        document.getElementById('controls-hint').textContent='WASD or Arrows to drive';
+        document.getElementById('map-label').style.display='none';
+        carGroups[1].visible=true;
+      }else{
+        document.getElementById('map-label').classList.add('visible');
+      }
+      document.getElementById('controls-hint').classList.add('visible');
+      document.getElementById('timer').classList.add('visible');
+      await initAudio();
+      await runCountdown();
+      document.body.tabIndex=0;document.body.focus();
+    }
+
+    driveBtn.addEventListener('click',async e=>{
+      e.stopPropagation();
+      if(multiplayer&&conn&&conn.open){
+        // Tell peer to start
+        conn.send({t:'start'});
+      }
+      beginGame();
+    });
+
+    // ─── Render Loop ─────────────────────────────────────
+
+    function drawTopoFull(scrollOff,activeCars){
+      topoCtx.fillStyle=T.bg;topoCtx.fillRect(0,0,W,H);
+      drawGrid();
+      buildField(activeCars,scrollOff);
+      drawFills();
+      drawRoad(scrollOff);
+      drawContours(activeCars);
+      drawFeatures(scrollOff);
+      drawLake(scrollOff);
+    }
+
+    function drawTopoSplit(scrollOff,activeCars){
+      // Build field once (shared terrain, both cars' effects)
+      buildField(activeCars,scrollOff);
+      // Render each half, centered on its player's car
+      for(let p=0;p<2;p++){
+        const c=cars[p];
+        const halfW=W/2,xOff=p*halfW;
+        // How much to shift the full-width map so car is centered in this half
+        const carPxX=c.nx*W; // car's x on full-width canvas
+        const halfCenter=halfW/2; // center of each half panel
+        const shiftX=halfCenter-carPxX;
+        topoCtx.save();
+        topoCtx.beginPath();
+        topoCtx.rect(xOff,0,halfW,H);
+        topoCtx.clip();
+        topoCtx.translate(xOff+shiftX,0);
+        // Draw full-width topo (will be clipped to this half)
+        topoCtx.fillStyle=T.bg;topoCtx.fillRect(-200,0,W+400,H);
+        drawGrid();
+        drawFills();
+        drawRoad(scrollOff);
+        drawContours(activeCars);
+        drawFeatures(scrollOff);
+        drawLake(scrollOff);
+        topoCtx.restore();
+      }
+      // Split line — solid visible divider
+      topoCtx.fillStyle='rgba(60,80,60,.35)';topoCtx.fillRect(W/2-1.5,0,3,H);
+      // Player labels
+      topoCtx.font='bold 10px sans-serif';topoCtx.textAlign='center';
+      topoCtx.fillStyle='rgba(60,80,60,.35)';
+      topoCtx.fillText('P1',W/4,H-12);
+      topoCtx.fillText('P2',W*3/4,H-12);
+    }
+
+    function frame(){
+      requestAnimationFrame(frame);
+      const now=performance.now(),dt=Math.min((now-lastTime)/1000,.05);lastTime=now;
+
+      // Pre-game: draw drifting topo behind overlay
+      if(!started){
+        previewScrollOffset+=.003*dt;
+        drawTopoFull(previewScrollOffset,[]);
+        renderer.clear();
+        return;
+      }
+
+      if(!anyFinished)gameTime+=dt;
+
+      // Update cars
+      const activeCars=multiplayer?cars:[cars[0]];
+      let maxDelta=0;
+
+      if(multiplayer){
+        // Only run physics for our local car
+        const localCar=cars[localIdx];
+        const d=updateCar(localCar,dt,sharedScrollOffset);
+        if(d!==undefined&&d>maxDelta)maxDelta=d;
+        // Apply remote car state
+        const remoteCar=cars[1-localIdx];
+        applyRemoteState(remoteCar,remoteCarState);
+        // Sync scroll
+        if(isHost){
+          // Host also runs remote car's delta contribution
+          const remoteD=updateCar(remoteCar,dt,sharedScrollOffset);
+          // Actually, don't double-run remote physics, just use host scroll
+          sharedScrollOffset=Math.max(0,sharedScrollOffset+maxDelta);
+          sendScroll(sharedScrollOffset);
+        }else{
+          // Guest uses host's authoritative scroll
+          if(remoteScroll!==null)sharedScrollOffset=remoteScroll;
+          else sharedScrollOffset=Math.max(0,sharedScrollOffset+maxDelta);
+        }
+        // Send local car state
+        sendTimer+=dt;
+        if(sendTimer>.033){sendTimer=0;sendCarState(localCar);} // ~30Hz
+      }else{
+        // Solo mode
+        const d=updateCar(cars[0],dt,sharedScrollOffset);
+        if(d!==undefined&&d>maxDelta)maxDelta=d;
+        sharedScrollOffset=Math.max(0,sharedScrollOffset+maxDelta);
+      }
+
+      // Compute screen positions
+      const aspect=W/H;
+      for(const c of activeCars){
+        const wx=(c.nx-.5)*2*oSize*aspect,wz=(.5-c.ny)*2*oSize;
+        const p=new THREE.Vector3(wx,0,wz);p.project(cam3d);
+        c.screenNX=(p.x+1)/2;c.screenNY=1-(p.y+1)/2;
+      }
+
+      // ─── Draw 2D topo ───────────────────────
+      if(multiplayer) drawTopoSplit(sharedScrollOffset,activeCars);
+      else drawTopoFull(sharedScrollOffset,activeCars);
+
+      // ─── 3D cars ────────────────────────────
+      const sx=cars[localIdx].warp>.01?(Math.random()-.5)*cars[localIdx].warp*.15:0;
+      const sz=cars[localIdx].catting?(Math.random()-.5)*.1:0;
+
+      for(const c of activeCars){
+        const g=carGroups[c.idx];
+        const wx=(c.nx-.5)*2*oSize*aspect,wz=(.5-c.ny)*2*oSize;
+        g.position.x=wx;g.position.z=wz;g.rotation.y=c.heading;
+
+        // Subtle terrain tilt
+        const elevAhead=sampleField(c.screenNX,c.screenNY-.015);
+        const elevBehind=sampleField(c.screenNX,c.screenNY+.015);
+        const slope=(elevAhead-elevBehind)/.03;
+        g.rotation.x=lerp(g.rotation.x,slope*TILT_SCALE,.15);
+        g.rotation.z=lerp(g.rotation.z,-c.lateralSpeed*.3,.1);
+        g.position.y=c.isOffRoad?Math.sin(now*.02*(1+c.warp*2))*c.warp*.15:0;
+        g.visible=true;
+      }
+      if(!multiplayer)carGroups[1].visible=false;
+
+      if(multiplayer){
+        // Split-screen 3D: render each car in its half
+        renderer.setScissorTest(true);renderer.clear();
+        const halfAspect=(W/2)/H;
+
+        for(let p=0;p<2;p++){
+          const xOff=p===0?0:W/2;
+          renderer.setViewport(xOff,0,W/2,H);
+          renderer.setScissor(xOff,0,W/2,H);
+
+          // Show only this player's car
+          carGroups[0].visible=(p===0);
+          carGroups[1].visible=(p===1);
+
+          // Adjust orthographic camera for half-width aspect
+          cam3d.left=-oSize*halfAspect;cam3d.right=oSize*halfAspect;
+          cam3d.top=oSize;cam3d.bottom=-oSize;
+
+          // Center camera on this player's car
+          const c=cars[p];
+          const cwx=(c.nx-.5)*2*oSize*aspect;
+          const cwz=(.5-c.ny)*2*oSize;
+          cam3d.position.set(cwx+(p===localIdx?sx:0),8,cwz+2+(p===localIdx?sz:0));
+          cam3d.lookAt(cwx,0,cwz);
+          cam3d.updateProjectionMatrix();
+
+          renderer.render(scene3d,cam3d);
+        }
+
+        renderer.setScissorTest(false);
+        renderer.setViewport(0,0,W,H);
+        // Restore camera
+        cam3d.left=-oSize*aspect;cam3d.right=oSize*aspect;
+        cam3d.top=oSize;cam3d.bottom=-oSize;
+        cam3d.position.set(sx,8,2+sz);cam3d.lookAt(0,0,0);
+        cam3d.updateProjectionMatrix();
+      }else{
+        // Solo: single render
+        cam3d.position.set(sx,8,2+sz);cam3d.lookAt(0,0,0);
+        renderer.render(scene3d,cam3d);
+      }
+
+      // Audio
+      updateAudio(baseScroll+cars[localIdx].speed,Math.max(...activeCars.map(c=>c.warp)));
+
+      // HUD
+      for(const c of activeCars){
+        const i=c.idx;
+        document.getElementById('h-speed-'+i).textContent=`${((0.02+c.speed)*1000).toFixed(0)} km/h`;
+        document.getElementById('h-terrain-'+i).textContent=c.isOffRoad?'OFF-ROAD':'ROAD';
+        document.getElementById('h-damage-'+i).textContent=`${Math.min(100,c.damage).toFixed(1)}%`;
+        document.getElementById('h-dist-'+i).textContent=`${Math.min(100,sharedScrollOffset/FINISH_DIST*100).toFixed(0)}%`;
+      }
+      const m=Math.floor(gameTime/60),s=(gameTime%60).toFixed(1);
+      timerEl.textContent=`${String(m).padStart(2,'0')}:${s.padStart(4,'0')}`;
+      timerEl.style.color=T.timer;
+
+      if(activeCars.some(c=>c.isOffRoad&&c.warp>.1))offroadFlash.classList.add('visible');
+      else offroadFlash.classList.remove('visible');
+    }
+    frame();
+  </script>
+</body>
+</html>
