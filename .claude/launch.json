@@ -3,10 +3,9 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "."],
-      "port": 3000,
-      "autoPort": true
+      "runtimeExecutable": "/Users/katarina/.nvm/versions/node/v24.7.0/bin/npx",
+      "runtimeArgs": ["http-server", "-p", "3456", "-c-1", "--silent"],
+      "port": 3456
     }
   ]
 }

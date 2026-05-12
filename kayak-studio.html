@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Kayak Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;height:100%;background:#7c96a8;font-family:'Oswald',-apple-system,sans-serif;color:rgba(240,240,230,.9);overflow:hidden}
+    canvas{display:block}
+    #studio-canvas{position:fixed;inset:0}
+    #panel{position:fixed;top:16px;right:16px;width:320px;max-height:calc(100vh - 32px);overflow-y:auto;
+           background:rgba(20,28,36,.78);backdrop-filter:blur(12px);border:1px solid rgba(220,230,235,.18);border-radius:8px;
+           padding:18px 20px;font-size:11px;letter-spacing:.08em;line-height:1.5}
+    #panel h1{margin:0 0 6px 0;font-family:'Alfa Slab One',serif;font-weight:400;font-size:20px;letter-spacing:.02em;color:rgba(245,235,210,.95)}
+    #panel .subtitle{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(210,220,215,.55);margin-bottom:16px}
+    .group{margin:14px 0;padding-top:12px;border-top:1px solid rgba(220,230,235,.12)}
+    .group:first-of-type{border-top:none;padding-top:0}
+    .group h3{margin:0 0 8px 0;font-weight:400;font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:rgba(200,215,220,.7)}
+    label{display:block;margin:6px 0;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(200,215,220,.65)}
+    label span.val{float:right;font-family:'SF Mono',monospace;font-size:11px;letter-spacing:0;color:rgba(245,235,210,.9);text-transform:none}
+    input[type=range]{width:100%;margin-top:3px;accent-color:#d4601a}
+    select{width:100%;padding:6px 8px;background:rgba(40,50,60,.6);color:rgba(240,240,230,.9);border:1px solid rgba(220,230,235,.22);border-radius:4px;font-family:inherit;font-size:11px;letter-spacing:.08em}
+    button{background:rgba(212,96,26,.28);color:rgba(245,230,210,.95);border:1px solid rgba(212,146,86,.5);padding:8px 14px;font-family:inherit;font-size:10px;letter-spacing:.2em;text-transform:uppercase;border-radius:4px;cursor:pointer;width:100%}
+    button:hover{background:rgba(212,96,26,.45)}
+    #state{font-family:'SF Mono',monospace;font-size:10px;line-height:1.7;letter-spacing:0;color:rgba(220,230,225,.75);text-transform:none}
+    #state b{color:rgba(245,235,210,.95);font-weight:500}
+    .desc{font-size:10px;color:rgba(200,215,220,.55);margin-top:4px;line-height:1.5;letter-spacing:.04em;text-transform:none}
+    #keys-hint{position:fixed;bottom:16px;left:16px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(240,240,230,.55)}
+    #keys-hint kbd{display:inline-block;padding:2px 7px;margin:0 1px;background:rgba(20,28,36,.55);border:1px solid rgba(220,230,235,.22);border-radius:3px;font-family:'SF Mono',monospace;font-size:10px}
+  </style>
+  <script type="importmap">
+  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js"}}
+  </script>
+</head>
+<body>
+  <canvas id="studio-canvas"></canvas>
+
+  <div id="panel">
+    <h1>Kayak Studio</h1>
+    <div class="subtitle">Tune visuals + steering feel</div>
+
+    <div class="group">
+      <h3>Paddle Mode</h3>
+      <select id="paddle-mode">
+        <option value="sine">A. Continuous sine (current in-game)</option>
+        <option value="hold-side">B. Key-side dip (paddle on the held key's side)</option>
+        <option value="alternating">C. W alternates, A/D hold on steer side</option>
+        <option value="opposite" selected>D. Realistic (paddle opposite of turn side)</option>
+      </select>
+      <div class="desc" id="mode-desc"></div>
+    </div>
+
+    <div class="group">
+      <h3>Paddle Style</h3>
+      <select id="paddle-style">
+        <option value="basic">A. Basic — stick + two blocks (current in-game)</option>
+        <option value="touring">B. Touring — asymmetric teardrop blades (Euro)</option>
+        <option value="greenland">C. Greenland — long narrow Inuit-style blades</option>
+        <option value="whitewater" selected>D. Whitewater — wide chunky blades</option>
+      </select>
+      <div class="desc" id="style-desc"></div>
+    </div>
+
+    <div class="group">
+      <h3>Cockpit Opening</h3>
+      <select id="cockpit-style">
+        <option value="round" selected>A. Round — small circular (sea/WW classic)</option>
+        <option value="keyhole">B. Keyhole — round front, tapered tail (modern WW)</option>
+        <option value="open">C. Open deck — sit-on-top rectangular recess</option>
+        <option value="tandem">D. Tandem — two circular cockpits</option>
+        <option value="slit">E. Racing slit — narrow elongated (surf-ski)</option>
+      </select>
+      <div class="desc" id="cockpit-desc"></div>
+    </div>
+
+    <div class="group">
+      <h3>Paddle Visual</h3>
+      <label>Sway amplitude <span class="val" id="val-sway">0.65</span>
+        <input id="sway" type="range" min="0.2" max="1.3" step="0.05" value="0.65">
+      </label>
+      <label>Dip response (lerp) <span class="val" id="val-lerp">16</span>
+        <input id="lerp" type="range" min="2" max="25" step="0.5" value="16">
+      </label>
+      <label>Stroke speed (W held) <span class="val" id="val-stroke">5.5</span>
+        <input id="stroke" type="range" min="2" max="10" step="0.5" value="5.5">
+      </label>
+    </div>
+
+    <div class="group">
+      <h3>Steering Physics</h3>
+      <label>Turn rate (heading change) <span class="val" id="val-turn">0.75</span>
+        <input id="turn" type="range" min="0.1" max="2" step="0.05" value="0.75">
+      </label>
+      <label>Lateral thrust (A/D) <span class="val" id="val-lat">0.90</span>
+        <input id="lat" type="range" min="0.2" max="2.0" step="0.05" value="0.9">
+      </label>
+      <label>Water drag <span class="val" id="val-drag">0.92</span>
+        <input id="drag" type="range" min="0.75" max="0.99" step="0.01" value="0.92">
+      </label>
+      <label>Heading recovery <span class="val" id="val-hrecov">0.92</span>
+        <input id="hrecov" type="range" min="0.75" max="0.99" step="0.01" value="0.92">
+      </label>
+      <label>Bank lean (visual) <span class="val" id="val-bank">2.2</span>
+        <input id="bank" type="range" min="0" max="5" step="0.1" value="2.2">
+      </label>
+      <label>Pivot offset (bow leads the turn) <span class="val" id="val-pivot">0.8</span>
+        <input id="pivot" type="range" min="0" max="2.5" step="0.1" value="0.8">
+      </label>
+      <div class="desc">0 = rotates around center (bow + stern swing equally). Higher = pivot shifts toward stern, bow sweeps wider.</div>
+    </div>
+
+    <div class="group">
+      <h3>Camera</h3>
+      <label><input id="cam-chase" type="checkbox" checked> Chase cam (follow the kayak)</label>
+      <div class="desc">Default: fixed camera so lateral movement is visible. Check to use the in-game trailing cam instead.</div>
+    </div>
+
+    <div class="group">
+      <h3>Live State</h3>
+      <div id="state"></div>
+    </div>
+
+    <button id="reset">Reset Kayak</button>
+  </div>
+
+  <div id="keys-hint">
+    <kbd>W</kbd> paddle &nbsp;·&nbsp; <kbd>A</kbd><kbd>D</kbd> steer &nbsp;·&nbsp; <kbd>S</kbd> back-paddle
+  </div>
+
+  <!--
+    ═══ Preset to port to the main game ═══════════════════════════════════
+    Paddle mode ................ D. Realistic (opposite of turn side)
+    Paddle style ............... D. Whitewater (wide chunky blades)
+    Cockpit opening ............ A. Round — small circular (sea/WW classic)
+    Sway amplitude ............. 0.65
+    Dip response (lerp) ........ 16
+    Stroke speed (W held) ...... 5.5
+    Turn rate .................. 0.75
+    Lateral thrust ............. 0.90
+    Water drag ................. 0.92
+    Heading recovery ........... 0.92
+    Bank lean .................. 2.2
+    Pivot offset (bow leads) ... 0.8
+    Paddler sphere ............. removed
+    ────────────────────────────────────────────────────────────────────────
+  -->
+  <script>
+    // Surface any module errors to the DOM for debugging
+    window._studioErrs = [];
+    window.addEventListener('error', e => {
+      window._studioErrs.push(`${e.message} @ ${e.filename || 'inline'}:${e.lineno}:${e.colno}`);
+    });
+    window.addEventListener('unhandledrejection', e => {
+      window._studioErrs.push(`REJECT: ${e.reason?.message || e.reason}`);
+    });
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    // ─── Scene setup ───────────────────────────────────────
+    const canvas=document.getElementById('studio-canvas');
+    let W=innerWidth,H=innerHeight;
+    const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+    renderer.setSize(W,H);
+    renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+    renderer.setClearColor(new THREE.Color('#7c96a8'));
+    const scene=new THREE.Scene();
+    scene.fog=new THREE.Fog(new THREE.Color('#7c96a8'),40,110);
+    const cam=new THREE.PerspectiveCamera(55,W/H,0.5,300);
+    cam.position.set(0,3.8,10);
+    cam.lookAt(0,0.3,-4);
+    window.addEventListener('resize',()=>{
+      W=innerWidth;H=innerHeight;renderer.setSize(W,H);cam.aspect=W/H;cam.updateProjectionMatrix();
+    });
+
+    scene.add(new THREE.AmbientLight(0xffffff,.55));
+    const dir=new THREE.DirectionalLight(0xfff4d8,1.1);
+    dir.position.set(6,12,4);scene.add(dir);
+    scene.add(new THREE.HemisphereLight(0x99bbdd,0x556633,.45));
+
+    // Big calm water plane so the kayak has something to sit on.
+    const waterMat=new THREE.MeshStandardMaterial({color:0x4e7a94,roughness:0.28,metalness:0.18});
+    const water=new THREE.Mesh(new THREE.PlaneGeometry(220,220),waterMat);
+    water.rotation.x=-Math.PI/2;water.position.y=0;scene.add(water);
+
+    // Subtle radial contour rings for a sense of place — same idiom as the
+    // main game's depth contours.
+    (function addRings(){
+      const mat=new THREE.LineBasicMaterial({color:0xbfe2ef,transparent:true,opacity:0.55,fog:true});
+      for(let i=1;i<=6;i++){
+        const r=i*6;
+        const pts=[];const n=96;
+        for(let j=0;j<=n;j++){
+          const a=j/n*Math.PI*2;
+          pts.push(new THREE.Vector3(Math.cos(a)*r,0.02,Math.sin(a)*r));
+        }
+        const g=new THREE.BufferGeometry().setFromPoints(pts);
+        scene.add(new THREE.LineLoop(g,mat));
+      }
+    })();
+
+    // ─── Kayak mesh (mirrors buildKayakMesh from the main game) ─────
+    function buildKayakMesh(){
+      const g=new THREE.Group();
+      const hullMat=new THREE.MeshStandardMaterial({color:0xd4601a,roughness:.45,metalness:.05});
+      const deckMat=new THREE.MeshStandardMaterial({color:0xb8500e,roughness:.5});
+      const cockpitMat=new THREE.MeshStandardMaterial({color:0x1a0c04,roughness:.85});
+      const bladeMat=new THREE.MeshStandardMaterial({color:0x5B2F08,roughness:.55});
+      const shaftMat=new THREE.MeshStandardMaterial({color:0x4a2008,roughness:.7});
+      const paddlerMat=new THREE.MeshStandardMaterial({color:0x3a5238,roughness:.85});
+      const handleMat=new THREE.MeshStandardMaterial({color:0x222222,roughness:.8});
+
+      const kL=4.4,kW=.85;
+      const shape=new THREE.Shape();
+      shape.moveTo(0,-kL/2);
+      shape.bezierCurveTo( kW,-kL*.3,  kW, kL*.3, 0, kL/2);
+      shape.bezierCurveTo(-kW, kL*.3, -kW,-kL*.3, 0,-kL/2);
+      const hullGeo=new THREE.ExtrudeGeometry(shape,{depth:.28,bevelEnabled:true,bevelThickness:.07,bevelSize:.05,bevelSegments:3});
+      const hull=new THREE.Mesh(hullGeo,hullMat);
+      hull.rotation.x=Math.PI/2;hull.position.y=0.05;g.add(hull);
+
+      const deckLine=new THREE.Mesh(new THREE.BoxGeometry(.06,.04,3.8),deckMat);
+      deckLine.position.set(0,0.42,0);g.add(deckLine);
+
+      // Cockpit is built separately + attached here so we can swap styles.
+      const cockpit=buildCockpit('round');
+      cockpit.position.set(0,0.42,0.3);g.add(cockpit);
+      g.userData.cockpit=cockpit;
+
+      for(const z of [-kL*.46,kL*.46]){
+        const h=new THREE.Mesh(new THREE.TorusGeometry(.07,.018,4,8,Math.PI),handleMat);
+        h.position.set(0,0.43,z);h.rotation.x=-Math.PI/2;g.add(h);
+      }
+
+      // Paddle is created separately + attached so we can swap styles.
+      const paddlePivot=buildPaddle('touring');
+      paddlePivot.position.set(0,0.72,0.3);g.add(paddlePivot);
+      g.userData.paddlePivot=paddlePivot;
+      g.userData.hullMat=hullMat;
+      return g;
+    }
+
+    // ─── Paddle style variants ─────────────────────────────
+    // Each variant returns a paddlePivot group that contains a shaft
+    // (horizontal along X) and two blades extending outward to ±X. The
+    // outer kayak code attaches this group to the kayak and rotates
+    // paddlePivot.rotation.z for the stroke animation, so only the
+    // blade + shaft geometry differs between styles.
+    const shaftCol=0x4a2008, bladeCol=0x5B2F08;
+
+    // Helper: make a 2D outline into a flat blade geometry extruded along Z
+    // (so the blade FACE is perpendicular to Z, like a real paddle face).
+    function bladeFromShape(shape,depth=0.014,bevel=false){
+      const opts={depth,bevelEnabled:bevel};
+      if(bevel)Object.assign(opts,{bevelThickness:0.004,bevelSize:0.006,bevelSegments:2});
+      const geo=new THREE.ExtrudeGeometry(shape,opts);
+      geo.translate(0,0,-depth/2);       // center the thickness around Z=0
+      return geo;
+    }
+
+    // A. Basic — current in-game look (stick + two perpendicular blocks).
+    function buildPaddleBasic(){
+      const pivot=new THREE.Group();
+      const shaftM=new THREE.MeshStandardMaterial({color:shaftCol,roughness:.7});
+      const bladeM=new THREE.MeshStandardMaterial({color:bladeCol,roughness:.55});
+      const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,3.2,8),shaftM);
+      shaft.rotation.z=Math.PI/2;pivot.add(shaft);
+      for(const sign of [-1,1]){
+        const blade=new THREE.Mesh(new THREE.BoxGeometry(.1,.04,.45),bladeM);
+        blade.position.set(sign*1.6,0,0);pivot.add(blade);
+      }
+      return pivot;
+    }
+
+    // B. Touring — asymmetric teardrop blades, classic euro shape. Blade
+    //    face is vertical (Y tall, X outward, Z thin), so it pushes water
+    //    backward during a stroke just like a real paddle.
+    function buildPaddleTouring(){
+      const pivot=new THREE.Group();
+      const shaftM=new THREE.MeshStandardMaterial({color:shaftCol,roughness:.7});
+      const bladeM=new THREE.MeshStandardMaterial({color:0x704028,roughness:.55});
+      const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.028,.028,3.4,8),shaftM);
+      shaft.rotation.z=Math.PI/2;pivot.add(shaft);
+
+      // Teardrop blade in X-Y plane (X = outward length, Y = vertical width)
+      const s=new THREE.Shape();
+      s.moveTo(0,-0.04);
+      s.bezierCurveTo(0.15,-0.12, 0.42,-0.13, 0.55,-0.02);   // lower edge
+      s.bezierCurveTo(0.55, 0.02, 0.48, 0.10, 0.32, 0.13);   // tip → upper bulge
+      s.bezierCurveTo(0.18, 0.12, 0.05, 0.08, 0, 0.04);      // back toward shaft
+      s.closePath();
+      const bladeGeo=bladeFromShape(s,0.014);
+
+      // Right blade at +X (shaft end), extending further +X
+      const right=new THREE.Mesh(bladeGeo,bladeM);
+      right.position.set(1.70,0,0);pivot.add(right);
+      // Left blade — mirror via negative X scale
+      const left=new THREE.Mesh(bladeGeo,bladeM);
+      left.position.set(-1.70,0,0);left.scale.x=-1;pivot.add(left);
+      return pivot;
+    }
+
+    // C. Greenland — long, narrow symmetric blades. Inuit-style paddle
+    //    with no pronounced power face; just an elongated wood leaf.
+    function buildPaddleGreenland(){
+      const pivot=new THREE.Group();
+      const shaftM=new THREE.MeshStandardMaterial({color:0x3a1808,roughness:.75});
+      const bladeM=new THREE.MeshStandardMaterial({color:0x543018,roughness:.6});
+      const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.023,.023,3.6,8),shaftM);
+      shaft.rotation.z=Math.PI/2;pivot.add(shaft);
+
+      const s=new THREE.Shape();
+      s.moveTo(0,-0.025);
+      s.bezierCurveTo(0.25,-0.045, 0.50,-0.045, 0.70,-0.010);   // lower
+      s.bezierCurveTo(0.50, 0.045, 0.25, 0.045, 0,   0.025);     // upper
+      s.closePath();
+      const bladeGeo=bladeFromShape(s,0.016);
+
+      const right=new THREE.Mesh(bladeGeo,bladeM);
+      right.position.set(1.80,0,0);pivot.add(right);
+      const left=new THREE.Mesh(bladeGeo,bladeM);
+      left.position.set(-1.80,0,0);left.scale.x=-1;pivot.add(left);
+      return pivot;
+    }
+
+    // D. Whitewater — wide chunky blades, short/fat shaft. Aggressive
+    //    creek-paddle silhouette.
+    function buildPaddleWhitewater(){
+      const pivot=new THREE.Group();
+      const shaftM=new THREE.MeshStandardMaterial({color:0x1a1a20,roughness:.5,metalness:.25});
+      const bladeM=new THREE.MeshStandardMaterial({color:0xc84620,roughness:.45});
+      const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.040,.040,3.0,8),shaftM);
+      shaft.rotation.z=Math.PI/2;pivot.add(shaft);
+
+      const s=new THREE.Shape();
+      s.moveTo(0,-0.11);
+      s.lineTo(0.20,-0.15);
+      s.lineTo(0.42,-0.13);
+      s.bezierCurveTo(0.52,-0.05, 0.52, 0.05, 0.42, 0.13);
+      s.lineTo(0.20, 0.15);
+      s.lineTo(0,    0.11);
+      s.closePath();
+      const bladeGeo=bladeFromShape(s,0.022,true);
+
+      const right=new THREE.Mesh(bladeGeo,bladeM);
+      right.position.set(1.50,0,0);pivot.add(right);
+      const left=new THREE.Mesh(bladeGeo,bladeM);
+      left.position.set(-1.50,0,0);left.scale.x=-1;pivot.add(left);
+      return pivot;
+    }
+
+    const paddleBuilders={
+      basic:buildPaddleBasic,
+      touring:buildPaddleTouring,
+      greenland:buildPaddleGreenland,
+      whitewater:buildPaddleWhitewater,
+    };
+    function buildPaddle(style){
+      return (paddleBuilders[style]||buildPaddleTouring)();
+    }
+
+    // ─── Cockpit opening variants ──────────────────────────
+    // Each builder returns a group containing the rim (ring of dark
+    // material) + the interior (dark flat plane below the rim). The group
+    // is then positioned at (0, 0.42, 0.3) on the kayak deck. In the
+    // Shape's 2D frame, +Y becomes "forward on kayak" after the extrude
+    // rotation; -Y becomes "aft".
+    const rimM=new THREE.MeshStandardMaterial({color:0x1a0c04,roughness:.85});
+    const darkM=new THREE.MeshStandardMaterial({color:0x0a0604,roughness:.95});
+
+    function makeRingGroup(outer,inner,rimHeight=0.035){
+      outer.holes.push(inner);
+      const rimGeo=new THREE.ExtrudeGeometry(outer,{depth:rimHeight,bevelEnabled:false});
+      rimGeo.rotateX(Math.PI/2);          // extrude depth now goes +Y (above deck)
+      const rim=new THREE.Mesh(rimGeo,rimM);
+      const holeGeo=new THREE.ShapeGeometry(inner);
+      holeGeo.rotateX(Math.PI/2);
+      const hole=new THREE.Mesh(holeGeo,darkM);
+      hole.position.y=-0.002;             // just below rim to prevent z-fighting
+      const g=new THREE.Group();
+      g.add(rim);g.add(hole);
+      return g;
+    }
+
+    // A. Classic round — small circular cockpit (whitewater / sea kayak).
+    function cockpitRound(){
+      const outer=new THREE.Shape();
+      outer.absellipse(0,0,0.28,0.28,0,Math.PI*2,false);
+      const inner=new THREE.Shape();
+      inner.absellipse(0,0,0.24,0.24,0,Math.PI*2,true);
+      return makeRingGroup(outer,inner);
+    }
+
+    // B. Keyhole — round front, tapered tail aft. Modern WW standard.
+    function cockpitKeyhole(){
+      const outer=new THREE.Shape();
+      outer.moveTo(-0.28, 0.02);
+      outer.bezierCurveTo(-0.28, 0.34, 0.28, 0.34, 0.28, 0.02);    // round front
+      outer.lineTo(0.15, -0.40);                                    // taper right
+      outer.lineTo(-0.15, -0.40);                                   // back
+      outer.closePath();
+      const inner=new THREE.Shape();
+      inner.moveTo(-0.24, 0.02);
+      inner.bezierCurveTo(-0.24, 0.30, 0.24, 0.30, 0.24, 0.02);
+      inner.lineTo(0.12, -0.36);
+      inner.lineTo(-0.12, -0.36);
+      inner.closePath();
+      return makeRingGroup(outer,inner);
+    }
+
+    // C. Open deck — large rectangular sit-on-top recess, minimal rim.
+    function cockpitOpen(){
+      const outer=new THREE.Shape();
+      const ox=0.46, oy=0.85;
+      outer.moveTo(-ox,-oy);outer.lineTo(ox,-oy);
+      outer.lineTo(ox,oy);outer.lineTo(-ox,oy);
+      outer.closePath();
+      const inner=new THREE.Shape();
+      const ix=0.42, iy=0.81;
+      inner.moveTo(-ix,-iy);inner.lineTo(-ix,iy);      // reverse winding
+      inner.lineTo(ix,iy);inner.lineTo(ix,-iy);
+      inner.closePath();
+      return makeRingGroup(outer,inner,0.02);
+    }
+
+    // D. Tandem — two round cockpits, one fore, one aft.
+    function cockpitTandem(){
+      const g=new THREE.Group();
+      const front=cockpitRound();
+      front.position.z=-0.55;
+      const back=cockpitRound();
+      back.position.z=0.55;
+      g.add(front);g.add(back);
+      return g;
+    }
+
+    // E. Racing slit — narrow elongated opening, surf-ski / sprint kayak.
+    function cockpitSlit(){
+      const outer=new THREE.Shape();
+      outer.absellipse(0,0,0.15,0.55,0,Math.PI*2,false);
+      const inner=new THREE.Shape();
+      inner.absellipse(0,0,0.11,0.51,0,Math.PI*2,true);
+      return makeRingGroup(outer,inner);
+    }
+
+    const cockpitBuilders={
+      round:cockpitRound,
+      keyhole:cockpitKeyhole,
+      open:cockpitOpen,
+      tandem:cockpitTandem,
+      slit:cockpitSlit,
+    };
+    function buildCockpit(style){
+      return (cockpitBuilders[style]||cockpitRound)();
+    }
+    // Two-group mesh so rotation can happen around a point behind the
+    // kayak's visual center — i.e. the bow swings wider than the stern
+    // during a turn, giving that "front leads" feel a real kayak has.
+    //   kayakOuter.position = world pivot point (what state.x/z refers to)
+    //   kayakOuter.rotation.y = heading      (rotation happens around the pivot)
+    //   kayakInner.position.z = -pivotOffset (mesh sits in front of pivot)
+    //   kayakInner.rotation.z = bank lean    (independent of heading)
+    const kayakOuter=new THREE.Group();
+    scene.add(kayakOuter);
+    const kayakInner=buildKayakMesh();
+    kayakOuter.add(kayakInner);
+
+    // ─── Input ─────────────────────────────────────────────
+    const keys={};
+    addEventListener('keydown',e=>{
+      const k=e.key.toLowerCase();
+      keys[k]=true;
+      if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();
+    });
+    addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+    const isDown=(...ks)=>ks.some(k=>keys[k]);
+
+    // ─── Tunable parameters (mirrored by UI sliders) ───────
+    // Default values match the preset at the top of this file — the one
+    // the user picked by playing with the sliders.
+    const P={
+      sway:0.65,
+      lerp:16,
+      stroke:5.5,
+      turn:0.75,
+      lat:0.90,
+      drag:0.92,
+      hrecov:0.92,
+      bank:2.2,
+      pivot:0.8,                          // rotation pivot offset (toward stern)
+      mode:'opposite',
+      chase:true,                         // camera: false=fixed, true=trail
+    };
+
+    // ─── Kayak state ───────────────────────────────────────
+    const state={
+      x:0, z:0,                            // world position (free 2D for studio)
+      heading:0,                           // radians
+      lateralSpeed:0,
+      speed:0,                             // forward paddle speed
+      paddleAngle:0,                       // for sine oscillation
+      paddleRot:0,                         // current smoothed paddle rotation
+    };
+    function reset(){
+      state.x=0;state.z=0;state.heading=0;state.lateralSpeed=0;state.speed=0;
+      state.paddleAngle=0;state.paddleRot=0;
+    }
+
+    // ─── Paddle behavior modes ─────────────────────────────
+    // Returns the TARGET rotation.z for the paddle pivot this frame. The
+    // frame loop lerps state.paddleRot toward this target.
+    const paddleModes={
+      sine(dt){
+        // Continuous sine oscillation regardless of input — current in-game
+        // behavior. Good reference but doesn't reflect which key is held.
+        const strokeMul=isDown('w','arrowup')?P.stroke:1.6;
+        state.paddleAngle+=dt*strokeMul;
+        return Math.sin(state.paddleAngle)*P.sway;
+      },
+      'hold-side'(dt){
+        // Arcade-intuitive: paddle visibly sits on the held-key's side while
+        // A/D are pressed. W alone → alternate both sides. Neither → rest at
+        // center. Steer side matches key side (A=left key=paddle on LEFT).
+        if(isDown('a','arrowleft'))return +P.sway;       // paddle dips LEFT
+        if(isDown('d','arrowright'))return -P.sway;      // paddle dips RIGHT
+        if(isDown('w','arrowup')){
+          state.paddleAngle+=dt*P.stroke;
+          return Math.sin(state.paddleAngle)*P.sway;
+        }
+        // idle drift — small sway so the paddle breathes
+        state.paddleAngle+=dt*1.2;
+        return Math.sin(state.paddleAngle)*P.sway*0.18;
+      },
+      alternating(dt){
+        // Hybrid: W alone alternates, A/D hold on their side. Similar to
+        // hold-side but W doesn't trump A/D — if you hold W+A together you
+        // still get the steering dip, not the alternation.
+        if(isDown('a','arrowleft'))return +P.sway;
+        if(isDown('d','arrowright'))return -P.sway;
+        if(isDown('w','arrowup')){
+          state.paddleAngle+=dt*P.stroke;
+          return Math.sin(state.paddleAngle)*P.sway;
+        }
+        return 0;
+      },
+      opposite(dt){
+        // Realistic: to TURN LEFT you paddle on the RIGHT side (right blade
+        // pulls the nose left). Less intuitive for arcade feel but matches
+        // real kayaking cause-and-effect.
+        if(isDown('a','arrowleft'))return -P.sway;       // right-side dip
+        if(isDown('d','arrowright'))return +P.sway;      // left-side dip
+        if(isDown('w','arrowup')){
+          state.paddleAngle+=dt*P.stroke;
+          return Math.sin(state.paddleAngle)*P.sway;
+        }
+        return 0;
+      },
+    };
+    const modeDescriptions={
+      sine:'The current in-game behavior. Paddle oscillates left-right continuously; A/D don\'t change which side the blade is on.',
+      'hold-side':'Arcade-intuitive: holding A or D plants the paddle on that side. W alone alternates normally. The key-held paddle stays visibly in the water on the steering side.',
+      alternating:'Similar to hold-side but cleaner resting pose when no key is held (no idle sway).',
+      opposite:'Mirrors real kayaking physics — to turn left you paddle on the RIGHT side. Clear cause-and-effect but counter-intuitive for players used to driving controls.',
+    };
+
+    // ─── Physics (mirrors updateKayak in the main game, free-2D) ───
+    function tick(dt){
+      // W/S — paddle thrust
+      if(isDown('w','arrowup'))state.speed+=.010*dt*.8;
+      if(isDown('s','arrowdown'))state.speed-=.010*dt*.8;
+      state.speed=Math.max(-.015,Math.min(.05,state.speed))*0.985;
+
+      // A/D — lateral thrust + heading rotation
+      if(isDown('a','arrowleft')){state.lateralSpeed-=P.lat*dt*.8;state.heading-=dt*P.turn;}
+      if(isDown('d','arrowright')){state.lateralSpeed+=P.lat*dt*.8;state.heading+=dt*P.turn;}
+      state.lateralSpeed*=P.drag;
+      state.heading*=P.hrecov;
+
+      // Free 2D movement — advance in the kayak's forward direction plus
+      // lateral drift from lateralSpeed. (Main game uses scroll+px; here
+      // we use real 2D world coords so the studio isn't constrained to a
+      // river.)
+      const forward=(0.012+state.speed)*dt*60*0.35;     // scale to world units
+      state.x+=Math.sin(state.heading)*forward + state.lateralSpeed*Math.cos(state.heading)*dt*0.4;
+      state.z-=Math.cos(state.heading)*forward - state.lateralSpeed*Math.sin(state.heading)*dt*0.4;
+
+      // Wrap around so the kayak stays in view. Tighter than before so the
+      // studio's fixed camera always has the kayak on screen.
+      if(state.x> 10)state.x=-10;else if(state.x<-10)state.x= 10;
+      if(state.z> 10)state.z=-10;else if(state.z<-10)state.z= 10;
+
+      // Paddle animation
+      const target=paddleModes[P.mode](dt);
+      state.paddleRot+=(target-state.paddleRot)*Math.min(1,dt*P.lerp);
+
+      // Outer = rotation pivot (what state.x/z actually refers to).
+      // Inner = the visible mesh, offset forward of the pivot so the bow
+      // swings wider than the stern when the outer rotates.
+      kayakOuter.position.set(state.x,0.05,state.z);
+      kayakOuter.rotation.y=state.heading;
+      kayakInner.position.z=-P.pivot;
+      kayakInner.rotation.z=-state.lateralSpeed*P.bank;
+      kayakInner.userData.paddlePivot.rotation.z=state.paddleRot;
+
+      // Camera — fixed by default (so lateral motion is visible as kayak
+      // drifting in the frame), optional chase mode mirrors the main game.
+      if(P.chase){
+        const behind=8;
+        const targetCamX=state.x-Math.sin(state.heading)*behind;
+        const targetCamZ=state.z+Math.cos(state.heading)*behind;
+        cam.position.x+=(targetCamX-cam.position.x)*Math.min(1,dt*3);
+        cam.position.z+=(targetCamZ-cam.position.z)*Math.min(1,dt*3);
+        cam.position.y=3.8;
+      }else{
+        cam.position.set(0,6,14);
+      }
+      cam.lookAt(state.x,0.3,state.z);
+    }
+
+    // ─── UI wiring ─────────────────────────────────────────
+    const ui=(id)=>document.getElementById(id);
+    const slider=(id,key,fmt=(v)=>(+v).toFixed(2))=>{
+      const el=ui(id);const valEl=ui('val-'+id);
+      el.addEventListener('input',()=>{
+        P[key]=parseFloat(el.value);
+        valEl.textContent=fmt(el.value);
+      });
+      valEl.textContent=fmt(el.value);
+    };
+    slider('sway','sway');
+    slider('lerp','lerp',v=>Math.round(+v));
+    slider('stroke','stroke',v=>(+v).toFixed(1));
+    slider('turn','turn');
+    slider('lat','lat');
+    slider('drag','drag');
+    slider('hrecov','hrecov');
+    slider('bank','bank',v=>(+v).toFixed(1));
+    slider('pivot','pivot',v=>(+v).toFixed(1));
+
+    const chaseEl=ui('cam-chase');
+    chaseEl.addEventListener('change',()=>{P.chase=chaseEl.checked});
+
+    const modeEl=ui('paddle-mode');
+    const modeDesc=ui('mode-desc');
+    function syncModeDesc(){modeDesc.textContent=modeDescriptions[P.mode]||''}
+    modeEl.addEventListener('change',()=>{P.mode=modeEl.value;syncModeDesc()});
+    P.mode=modeEl.value;syncModeDesc();
+
+    // Paddle style swap — rebuilds the paddle on the live kayakInner and
+    // restores the current stroke rotation so the visual swap is seamless.
+    const styleDescriptions={
+      basic:'The original studio/in-game paddle — a thin shaft with two flat rectangular blocks. Quick and readable at distance but reads as "placeholder".',
+      touring:'Classic Euro-style paddle: asymmetric teardrop blades that push water efficiently on one face. The default kayaking silhouette.',
+      greenland:'Traditional Inuit paddle — long, narrow, symmetric blades on a slender shaft. Elegant and distinctly non-modern.',
+      whitewater:'Short, beefy shaft with wide rectangular blades. Built for aggressive strokes through rapids — less efficient cruising but high-grip.',
+    };
+    const styleEl=ui('paddle-style');
+    const styleDesc=ui('style-desc');
+    function swapPaddle(style){
+      const old=kayakInner.userData.paddlePivot;
+      const rotZ=old?old.rotation.z:0;
+      if(old)kayakInner.remove(old);
+      const next=buildPaddle(style);
+      next.position.set(0,0.72,0.3);
+      next.rotation.z=rotZ;
+      kayakInner.add(next);
+      kayakInner.userData.paddlePivot=next;
+      styleDesc.textContent=styleDescriptions[style]||'';
+    }
+    styleEl.addEventListener('change',()=>swapPaddle(styleEl.value));
+    swapPaddle(styleEl.value);
+
+    // Cockpit swap — same pattern as paddle swap: remove the existing
+    // cockpit group from kayakInner, build the new one, reattach at the
+    // standard position (0, 0.42, 0.3).
+    const cockpitDescriptions={
+      round:'Small tight round opening — the classic sea-kayak / playboat cockpit. Snug around the paddler.',
+      keyhole:'Round front for sitting, narrowing tail aft. The modern whitewater standard — easier egress in a rescue.',
+      open:'Large rectangular recess with only a lip around the edge — sit-on-top recreational style. Most exposed, most stable.',
+      tandem:'Two circular cockpits in line. Two paddlers, or one paddler + gear.',
+      slit:'Narrow elongated opening. Surf-ski / sprint kayak — optimized for speed, minimal deck cutout.',
+    };
+    const cockpitEl=ui('cockpit-style');
+    const cockpitDesc=ui('cockpit-desc');
+    function swapCockpit(style){
+      const old=kayakInner.userData.cockpit;
+      if(old)kayakInner.remove(old);
+      const next=buildCockpit(style);
+      next.position.set(0,0.42,0.3);
+      kayakInner.add(next);
+      kayakInner.userData.cockpit=next;
+      cockpitDesc.textContent=cockpitDescriptions[style]||'';
+    }
+    cockpitEl.addEventListener('change',()=>swapCockpit(cockpitEl.value));
+    swapCockpit(cockpitEl.value);
+
+    ui('reset').addEventListener('click',reset);
+
+    const stateEl=ui('state');
+    function renderState(){
+      const f=(v,d=3)=>(v>=0?' ':'')+(+v).toFixed(d);
+      stateEl.innerHTML=
+        `x: <b>${f(state.x,2)}</b>  z: <b>${f(state.z,2)}</b><br>`
+       +`heading: <b>${f(state.heading,3)}</b> rad<br>`
+       +`lateralSpeed: <b>${f(state.lateralSpeed,3)}</b><br>`
+       +`speed: <b>${f(state.speed,4)}</b><br>`
+       +`paddleRot: <b>${f(state.paddleRot,3)}</b>`;
+    }
+
+    // ─── Loop ──────────────────────────────────────────────
+    let last=performance.now();
+    function frame(){
+      requestAnimationFrame(frame);
+      const now=performance.now();
+      const dt=Math.min(.05,(now-last)/1000);
+      last=now;
+      tick(dt);
+      renderState();
+      renderer.render(scene,cam);
+    }
+    frame();
+    // Focus body so key events arrive even if user hasn't clicked yet
+    document.body.tabIndex=0;
+    document.body.focus();
+  </script>
+</body>
+</html>
