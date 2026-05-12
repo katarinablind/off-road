@@ -1,0 +1,18 @@
+# Claude Code — local permissions per developer, never check in
+.claude/settings.local.json
+
+# macOS noise
+.DS_Store
+
+# Editor / OS junk
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Node (in case you ever add a package.json)
+node_modules/
+
+# Build / temp artifacts
+*.zip
+*.log
