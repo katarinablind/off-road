@@ -161,6 +161,69 @@
     .fin-card .btn.fin-secondary{background:transparent;color:rgba(238,238,232,0.85);border:1px solid rgba(238,238,232,0.28)}
     .fin-card .btn.fin-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(238,238,232,0.6);color:rgba(255,255,255,1)}
     .fin-card .kayak-pulse{animation:none;box-shadow:0 4px 22px -6px rgba(120,180,255,0.45)}
+
+    /* ─── On-screen touch controls ──────────────────────────────────────
+       Maps to the same keys[] entries the keyboard uses, so all physics +
+       gameplay stays untouched. Two clusters: left = steering arrows,
+       right = accelerate/brake. Auto-shown on coarse-pointer devices
+       (phones, tablets, hybrid laptops in tablet mode). Force-show with
+       <body class="force-touch"> if you want them on desktop for testing. */
+    #touch-controls{position:fixed;inset:0;z-index:60;pointer-events:none;display:none}
+    .tc-cluster{position:absolute;bottom:max(20px,env(safe-area-inset-bottom,20px));display:flex;gap:14px;pointer-events:auto}
+    .tc-steer{left:max(18px,env(safe-area-inset-left,18px))}
+    .tc-accel{right:max(18px,env(safe-area-inset-right,18px))}
+    .tc-btn{width:68px;height:68px;border-radius:999px;border:1px solid rgba(245,245,238,0.55);background:rgba(8,12,16,0.42);-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);color:rgba(250,250,244,0.96);font-family:'DM Sans',sans-serif;font-size:28px;font-weight:500;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .08s ease,background .12s ease,border-color .12s ease;padding:0}
+    .tc-btn:active,.tc-btn.tc-pressed{background:rgba(255,255,255,0.30);border-color:rgba(255,255,255,0.85);transform:scale(0.93)}
+    @media (pointer:coarse),(hover:none){#touch-controls{display:block}}
+    body.force-touch #touch-controls{display:block}
+
+    /* ─── Mobile layout refinements ─────────────────────────────────────
+       Reflow the chrome on narrow viewports so the bottom strip is free
+       for thumbs. Minimap shrinks + moves to top-left, HUD readouts go
+       to top-right, the cartographic scale label and music toggle hide
+       (already small and not essential on a phone). */
+    @media (max-width:768px){
+      #overlay{padding:5vh 6vw}
+      #overlay h1{font-size:clamp(38px,9vw,60px)}
+      .subtitle{font-size:13px}
+      .overlay-controls{font-size:12px}
+      .drive-btn{padding:14px 32px;font-size:15px}
+
+      /* Minimap → top-left, smaller, with the legend tucked beside it.   */
+      #minimap{bottom:auto;top:12px;left:12px}
+      #minimap canvas{width:140px;height:140px}
+      #map-scale{display:none}
+
+      /* HUD readouts → top-right, smaller, single-line gauges.           */
+      #hud-left{right:12px;bottom:auto;top:12px;font-size:12px;line-height:1.5;text-align:right}
+      #hud-right{right:12px;top:90px;font-size:12px;line-height:1.5}
+      .hud-title{font-size:13px;margin-bottom:4px}
+
+      /* Level indicator gets out of the way of the bottom-right cluster. */
+      #level-indicator{bottom:auto;top:120px;right:12px}
+
+      /* Progress bar shorter so it doesn't ride the minimap.             */
+      #progress-bar{top:auto;bottom:104px;width:120px}
+
+      /* Finish screen — tighter padding for small phones.                */
+      .fin-card{padding:18px 18px 22px;max-width:100%}
+      #finish-screen h2{font-size:clamp(26px,7vw,36px);margin-bottom:8px}
+      .stat-row{gap:24px}
+
+      /* Tune panel — when ?act2tune=1 is enabled, scale it down.         */
+      #act2-tune{width:230px;font-size:10px}
+
+      /* Bump all .btn tap targets to comfortable thumb size on phones.   */
+      .btn{padding:12px 22px;font-size:14px}
+      .fin-card .btn{padding:14px 26px;font-size:14px}
+    }
+
+    /* Swap the overlay's keyboard chip hint for a tap hint on touch. */
+    .overlay-controls .touch-hint{display:none}
+    @media (pointer:coarse),(hover:none){
+      .overlay-controls .kbd-hint{display:none}
+      .overlay-controls .touch-hint{display:inline}
+    }
   </style>
 </head>
 <body>
@@ -171,7 +234,10 @@
   <div id="overlay">
     <h1>Off the Road</h1>
     <p class="subtitle">start your adventure</p>
-    <div class="overlay-controls"><span>A</span> <span>D</span> steer &nbsp;&middot;&nbsp; <span>W</span> <span>S</span> speed</div>
+    <div class="overlay-controls">
+      <span class="kbd-hint"><span>A</span> <span>D</span> steer &nbsp;&middot;&nbsp; <span>W</span> <span>S</span> speed</span>
+      <span class="touch-hint">Tap arrow buttons to drive</span>
+    </div>
 
     <div class="mode-row" style="display:none">
       <button class="btn mode-btn active" data-mode="solo">Solo</button>
@@ -215,6 +281,22 @@
   <div id="level-indicator"><canvas id="level-canvas" width="120" height="40"></canvas></div>
   <div id="minimap"><canvas id="minimap-canvas" width="240" height="240"></canvas></div>
   <div id="act2-tune" style="display:none"></div>
+
+  <!-- Touch controls. Buttons map 1:1 to keyboard arrow keys via the
+       module script below, so the existing keyDown() input layer doesn't
+       need to know touch exists. CSS hides this unless the device has a
+       coarse pointer (phone / tablet / hybrid in tablet mode), or you
+       force-show via <body class="force-touch"> for desktop testing. -->
+  <div id="touch-controls" aria-hidden="true">
+    <div class="tc-cluster tc-steer">
+      <button class="tc-btn" data-tc="arrowleft" aria-label="Steer left" type="button">←</button>
+      <button class="tc-btn" data-tc="arrowright" aria-label="Steer right" type="button">→</button>
+    </div>
+    <div class="tc-cluster tc-accel">
+      <button class="tc-btn" data-tc="arrowdown" aria-label="Slow down" type="button">↓</button>
+      <button class="tc-btn" data-tc="arrowup" aria-label="Accelerate" type="button">↑</button>
+    </div>
+  </div>
 
 
   <div id="finish-screen">
@@ -2020,6 +2102,29 @@
     const keys={};
     addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;if(['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d',' '].includes(k))e.preventDefault()});
     addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+
+    // On-screen touch controls — each .tc-btn maps to a keyboard arrow
+    // key (data-tc attribute), so pressing the button has the exact same
+    // effect on physics + input as pressing the equivalent arrow key.
+    // setPointerCapture keeps the release event firing even if the
+    // finger drags off the button, preventing stuck-key sticky states.
+    for(const btn of document.querySelectorAll('#touch-controls .tc-btn')){
+      const k=btn.dataset.tc;
+      const press=(e)=>{
+        e.preventDefault();
+        keys[k]=true;
+        btn.classList.add('tc-pressed');
+        if(e.pointerId!==undefined&&btn.setPointerCapture){
+          try{btn.setPointerCapture(e.pointerId)}catch(_){/* older browsers */}
+        }
+      };
+      const release=()=>{keys[k]=false;btn.classList.remove('tc-pressed')};
+      btn.addEventListener('pointerdown',press);
+      btn.addEventListener('pointerup',release);
+      btn.addEventListener('pointercancel',release);
+      btn.addEventListener('pointerleave',release);
+      btn.addEventListener('contextmenu',(e)=>e.preventDefault());
+    }
 
     function keyDown(pIdx,action){
       const acts=[['w','arrowup'],['s','arrowdown'],['a','arrowleft'],['d','arrowright']];
