@@ -162,26 +162,93 @@
     .fin-card .btn.fin-secondary:hover{background:rgba(255,255,255,0.08);border-color:rgba(238,238,232,0.6);color:rgba(255,255,255,1)}
     .fin-card .kayak-pulse{animation:none;box-shadow:0 4px 22px -6px rgba(120,180,255,0.45)}
 
-    /* ─── On-screen touch controls ──────────────────────────────────────
-       Maps to the same keys[] entries the keyboard uses, so all physics +
-       gameplay stays untouched. Two clusters: left = steering arrows,
-       right = accelerate/brake. Auto-shown on coarse-pointer devices
-       (phones, tablets, hybrid laptops in tablet mode). Force-show with
-       <body class="force-touch"> if you want them on desktop for testing. */
-    #touch-controls{position:fixed;inset:0;z-index:60;pointer-events:none;display:none}
-    .tc-cluster{position:absolute;bottom:max(20px,env(safe-area-inset-bottom,20px));display:flex;gap:14px;pointer-events:auto}
-    .tc-steer{left:max(18px,env(safe-area-inset-left,18px))}
-    .tc-accel{right:max(18px,env(safe-area-inset-right,18px))}
-    .tc-btn{width:68px;height:68px;border-radius:999px;border:1px solid rgba(245,245,238,0.55);background:rgba(8,12,16,0.42);-webkit-backdrop-filter:blur(12px) saturate(140%);backdrop-filter:blur(12px) saturate(140%);color:rgba(250,250,244,0.96);font-family:'DM Sans',sans-serif;font-size:28px;font-weight:500;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .08s ease,background .12s ease,border-color .12s ease;padding:0}
-    .tc-btn:active,.tc-btn.tc-pressed{background:rgba(255,255,255,0.30);border-color:rgba(255,255,255,0.85);transform:scale(0.93)}
-    @media (pointer:coarse),(hover:none){#touch-controls{display:block}}
-    body.force-touch #touch-controls{display:block}
+    /* ─── On-screen touch controls (inverted-T D-pad) ───────────────────
+       Single cluster centered at the bottom edge, shaped like a keyboard
+       arrow-key cluster: ↑ on top, ← ↓ → on the bottom row. Each button
+       maps 1:1 to a keyboard arrow key via keys[], so the existing
+       keyDown() input layer is untouched.
 
-    /* ─── Mobile layout refinements ─────────────────────────────────────
-       Reflow the chrome on narrow viewports so the bottom strip is free
-       for thumbs. Minimap shrinks + moves to top-left, HUD readouts go
-       to top-right, the cartographic scale label and music toggle hide
-       (already small and not essential on a phone). */
+       Visibility model:
+       - On mobile (max-width:768px) we auto-show; phones can't play
+         without it and a toggle pill there would just be clutter.
+       - On tablets / laptops / desktops we DON'T auto-show — a small
+         "Touch controls" pill in the corner toggles them on demand.
+         (Touch-screen laptops report pointer:coarse, so the previous
+         pointer:coarse trigger was showing the pad on machines that
+         already had a keyboard, overlapping the HUD.)                  */
+    #touch-controls{
+      position:fixed;
+      bottom:max(20px,env(safe-area-inset-bottom,20px));
+      left:50%;
+      transform:translateX(-50%);
+      z-index:60;
+      display:none;
+      pointer-events:none;
+    }
+    body.touch-on #touch-controls{display:block}
+    @media (max-width:768px){#touch-controls{display:block}}
+    .tc-pad{
+      display:grid;
+      grid-template-columns:64px 64px 64px;
+      grid-template-rows:64px 64px;
+      gap:8px;
+      pointer-events:auto;
+    }
+    .tc-up   {grid-column:2;grid-row:1}
+    .tc-left {grid-column:1;grid-row:2}
+    .tc-down {grid-column:2;grid-row:2}
+    .tc-right{grid-column:3;grid-row:2}
+    .tc-btn{
+      width:64px;height:64px;
+      border-radius:18px;
+      border:1px solid rgba(245,245,238,0.45);
+      background:rgba(20,28,34,0.42);
+      -webkit-backdrop-filter:blur(12px) saturate(140%);
+      backdrop-filter:blur(12px) saturate(140%);
+      color:rgba(250,250,244,0.96);
+      font-family:'DM Sans',sans-serif;
+      font-size:26px;font-weight:500;line-height:1;
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;padding:0;
+      touch-action:none;user-select:none;-webkit-user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      transition:transform .08s ease,background .12s ease,border-color .12s ease;
+      box-shadow:0 4px 16px -8px rgba(0,0,0,0.45);
+    }
+    .tc-btn:active,.tc-btn.tc-pressed{
+      background:rgba(255,255,255,0.30);
+      border-color:rgba(255,255,255,0.85);
+      transform:scale(0.93);
+    }
+
+    /* Toggle pill — shows only on viewports > 768px (mobile auto-shows
+       the pad so the pill would be redundant + cluttering). Sits in the
+       top-right corner; the bottom-right is taken by the HUD readout on
+       desktop, so we'd overlap there. Frosted-glass styling to match the
+       minimap and HUD chrome.                                          */
+    #touch-toggle{
+      position:fixed;
+      top:14px;right:14px;
+      z-index:70;
+      padding:7px 14px;
+      font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;
+      letter-spacing:0;color:rgba(35,50,35,0.85);
+      background:rgba(245,238,222,0.55);
+      border:1px solid rgba(120,100,70,0.28);
+      border-radius:999px;
+      cursor:pointer;
+      -webkit-backdrop-filter:blur(8px) saturate(140%);
+      backdrop-filter:blur(8px) saturate(140%);
+      transition:background .15s ease,border-color .15s ease;
+    }
+    #touch-toggle:hover{background:rgba(250,244,228,0.82);border-color:rgba(120,100,70,0.5)}
+    @media (max-width:768px){#touch-toggle{display:none}}
+
+    /* ─── Mobile layout (≤768px) ────────────────────────────────────────
+       Top-left + top-right corners become a balanced telemetry pair:
+       minimap (left) and HUD readout (right) share the same frosted-glass
+       styling so they read as one unit, not two random elements. Center
+       top is the progress bar. Bottom-center is the touch pad. */
     @media (max-width:768px){
       #overlay{padding:5vh 6vw}
       #overlay h1{font-size:clamp(38px,9vw,60px)}
@@ -189,41 +256,57 @@
       .overlay-controls{font-size:12px}
       .drive-btn{padding:14px 32px;font-size:15px}
 
-      /* Minimap → top-left, smaller, with the legend tucked beside it.   */
-      #minimap{bottom:auto;top:12px;left:12px}
-      #minimap canvas{width:140px;height:140px}
+      /* Minimap: smaller, top-left, frosted card.                       */
+      #minimap{bottom:auto;top:12px;left:12px;border-radius:12px;border:1px solid rgba(80,70,55,0.32);box-shadow:0 4px 18px -8px rgba(20,15,10,0.32)}
+      #minimap canvas{width:110px;height:110px;display:block}
       #map-scale{display:none}
 
-      /* HUD readouts → top-right, smaller, single-line gauges.           */
-      #hud-left{right:12px;bottom:auto;top:12px;font-size:12px;line-height:1.5;text-align:right}
-      #hud-right{right:12px;top:90px;font-size:12px;line-height:1.5}
-      .hud-title{font-size:13px;margin-bottom:4px}
+      /* HUD readout: paired with the minimap visually. Same border
+         radius + frosted bg + size class. Sits top-right, compact.     */
+      #hud-left{
+        right:12px;left:auto;bottom:auto;top:12px;
+        min-width:96px;max-width:46vw;
+        padding:8px 12px;
+        font-size:11px;line-height:1.5;text-align:right;
+        background:rgba(245,238,222,0.55);
+        border:1px solid rgba(80,70,55,0.32);
+        border-radius:12px;
+        -webkit-backdrop-filter:blur(8px) saturate(140%);
+        backdrop-filter:blur(8px) saturate(140%);
+        box-shadow:0 4px 18px -8px rgba(20,15,10,0.32);
+      }
+      #hud-right{right:12px;top:auto;bottom:auto;font-size:11px;line-height:1.5}
+      .hud-title{font-size:12px;margin-bottom:2px}
 
-      /* Level indicator gets out of the way of the bottom-right cluster. */
-      #level-indicator{bottom:auto;top:120px;right:12px}
+      /* Hide the standalone level indicator on mobile — the dots in
+         the HUD readout already communicate stability. Saves a slot.   */
+      #level-indicator{display:none}
 
-      /* Progress bar shorter so it doesn't ride the minimap.             */
-      #progress-bar{top:auto;bottom:104px;width:120px}
+      /* Progress bar — keep at top (above the chrome row).              */
+      #progress-bar{top:8px;width:120px}
 
-      /* Finish screen — tighter padding for small phones.                */
+      /* Finish screen — tighter padding for small phones.               */
       .fin-card{padding:18px 18px 22px;max-width:100%}
       #finish-screen h2{font-size:clamp(26px,7vw,36px);margin-bottom:8px}
       .stat-row{gap:24px}
 
-      /* Tune panel — when ?act2tune=1 is enabled, scale it down.         */
+      /* Tune panel — when ?act2tune=1 is enabled, scale it down.        */
       #act2-tune{width:230px;font-size:10px}
 
-      /* Bump all .btn tap targets to comfortable thumb size on phones.   */
+      /* Bump all .btn tap targets to comfortable thumb size on phones.  */
       .btn{padding:12px 22px;font-size:14px}
       .fin-card .btn{padding:14px 26px;font-size:14px}
     }
 
-    /* Swap the overlay's keyboard chip hint for a tap hint on touch. */
+    /* Overlay hint: swap keyboard chips for a tap hint when the touch
+       pad is enabled (either by the mobile media query or the toggle). */
     .overlay-controls .touch-hint{display:none}
-    @media (pointer:coarse),(hover:none){
+    @media (max-width:768px){
       .overlay-controls .kbd-hint{display:none}
       .overlay-controls .touch-hint{display:inline}
     }
+    body.touch-on .overlay-controls .kbd-hint{display:none}
+    body.touch-on .overlay-controls .touch-hint{display:inline}
   </style>
 </head>
 <body>
@@ -282,21 +365,21 @@
   <div id="minimap"><canvas id="minimap-canvas" width="240" height="240"></canvas></div>
   <div id="act2-tune" style="display:none"></div>
 
-  <!-- Touch controls. Buttons map 1:1 to keyboard arrow keys via the
-       module script below, so the existing keyDown() input layer doesn't
-       need to know touch exists. CSS hides this unless the device has a
-       coarse pointer (phone / tablet / hybrid in tablet mode), or you
-       force-show via <body class="force-touch"> for desktop testing. -->
-  <div id="touch-controls" aria-hidden="true">
-    <div class="tc-cluster tc-steer">
-      <button class="tc-btn" data-tc="arrowleft" aria-label="Steer left" type="button">←</button>
-      <button class="tc-btn" data-tc="arrowright" aria-label="Steer right" type="button">→</button>
-    </div>
-    <div class="tc-cluster tc-accel">
-      <button class="tc-btn" data-tc="arrowdown" aria-label="Slow down" type="button">↓</button>
-      <button class="tc-btn" data-tc="arrowup" aria-label="Accelerate" type="button">↑</button>
+  <!-- Touch controls. Inverted-T D-pad (matches the keyboard arrow-key
+       cluster shape), centered at the bottom edge. Each button maps to
+       a keyboard arrow key via keys[], so the existing keyDown() input
+       layer doesn't change. Auto-visible on mobile (≤768px); on larger
+       viewports the #touch-toggle pill flips a body class to show. -->
+  <div id="touch-controls" role="group" aria-label="Touch directional controls">
+    <div class="tc-pad">
+      <button class="tc-btn tc-up"    data-tc="arrowup"    aria-label="Forward"  type="button">↑</button>
+      <button class="tc-btn tc-left"  data-tc="arrowleft"  aria-label="Left"     type="button">←</button>
+      <button class="tc-btn tc-down"  data-tc="arrowdown"  aria-label="Slow"     type="button">↓</button>
+      <button class="tc-btn tc-right" data-tc="arrowright" aria-label="Right"    type="button">→</button>
     </div>
   </div>
+  <!-- Toggle pill — desktop / tablet / hybrid only (hidden on phones). -->
+  <button id="touch-toggle" type="button" aria-label="Toggle touch controls">Show touch pad</button>
 
 
   <div id="finish-screen">
@@ -2124,6 +2207,20 @@
       btn.addEventListener('pointercancel',release);
       btn.addEventListener('pointerleave',release);
       btn.addEventListener('contextmenu',(e)=>e.preventDefault());
+    }
+
+    // Toggle pill — flips body.touch-on on non-mobile so the user can
+    // opt in to the touch pad. Mobile auto-shows the pad and CSS hides
+    // this pill there, so the click handler runs only on tablets /
+    // laptops / desktops. Updated label reflects current state.
+    {
+      const toggle=document.getElementById('touch-toggle');
+      if(toggle){
+        toggle.addEventListener('click',()=>{
+          const on=document.body.classList.toggle('touch-on');
+          toggle.textContent=on?'Hide touch pad':'Show touch pad';
+        });
+      }
     }
 
     function keyDown(pIdx,action){
