@@ -230,16 +230,21 @@
       transform:scale(0.93);
     }
 
-    /* Toggle pill — shows only on viewports > 768px (mobile auto-shows
-       the pad so the pill would be redundant + cluttering). Sits in the
-       top-right corner; the bottom-right is taken by the HUD readout on
-       desktop, so we'd overlap there. Frosted-glass styling to match the
-       minimap and HUD chrome.                                          */
+    /* Toggle pill — lives where the pad itself would appear (bottom
+       center) so the spatial relationship is clear. When the pad turns
+       on, the pill lifts above it. Three visibility tiers:
+       - mobile (≤768px): hidden, pad auto-shows.
+       - tablet (769–1024px): full frosted-glass pill, keep it inviting
+         because touch is the likely primary input on this size.
+       - desktop (>1024px): faded down to a subtle hint, brightens on
+         hover. Most desktop users will use the keyboard anyway. */
     #touch-toggle{
       position:fixed;
-      top:14px;right:14px;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:max(24px,env(safe-area-inset-bottom,24px));
       z-index:70;
-      padding:7px 14px;
+      padding:6px 14px;
       font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;
       letter-spacing:0;color:rgba(35,50,35,0.85);
       background:rgba(245,238,222,0.55);
@@ -248,10 +253,32 @@
       cursor:pointer;
       -webkit-backdrop-filter:blur(8px) saturate(140%);
       backdrop-filter:blur(8px) saturate(140%);
-      transition:background .15s ease,border-color .15s ease;
+      transition:background .15s ease,border-color .15s ease,opacity .2s ease,color .15s ease,bottom .25s ease;
     }
     #touch-toggle:hover{background:rgba(250,244,228,0.82);border-color:rgba(120,100,70,0.5)}
+    /* When the pad is showing, lift the pill above the pad (pad is
+       136px tall + 24px bottom margin = ~170px from the bottom edge). */
+    body.touch-on #touch-toggle{
+      bottom:max(180px,calc(env(safe-area-inset-bottom,0px) + 180px));
+    }
     @media (max-width:768px){#touch-toggle{display:none}}
+    /* Desktop: make the pill subtle — keyboard is the primary input. */
+    @media (min-width:1025px){
+      #touch-toggle{
+        padding:4px 11px;
+        font-size:10px;
+        color:rgba(60,70,55,0.55);
+        background:rgba(245,238,222,0.22);
+        border-color:rgba(120,100,70,0.15);
+        opacity:0.55;
+      }
+      #touch-toggle:hover{
+        color:rgba(35,50,35,0.95);
+        background:rgba(250,244,228,0.72);
+        border-color:rgba(120,100,70,0.42);
+        opacity:1;
+      }
+    }
 
     /* ─── Mobile layout (≤768px) ────────────────────────────────────────
        Top-left + top-right corners become a balanced telemetry pair:
