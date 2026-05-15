@@ -187,18 +187,23 @@
     }
     body.touch-on #touch-controls{display:block}
     @media (max-width:768px){#touch-controls{display:block}}
+    /* Hide the pad + toggle pill while the splash overlay is visible —
+       the pad isn't useful on the start screen. Both #overlay and the
+       touch elements are direct children of body, so the general
+       sibling combinator picks them up. */
+    #overlay:not(.hidden)~#touch-controls,
+    #overlay:not(.hidden)~#touch-toggle{display:none !important}
+
+    /* Inverted-T D-pad. Absolute-positioning each button inside an
+       explicitly-sized container is more robust than grid (some mobile
+       browsers were collapsing the grid to a single column). */
     .tc-pad{
-      display:grid;
-      grid-template-columns:64px 64px 64px;
-      grid-template-rows:64px 64px;
-      gap:8px;
+      position:relative;
+      width:200px;height:136px;
       pointer-events:auto;
     }
-    .tc-up   {grid-column:2;grid-row:1}
-    .tc-left {grid-column:1;grid-row:2}
-    .tc-down {grid-column:2;grid-row:2}
-    .tc-right{grid-column:3;grid-row:2}
     .tc-btn{
+      position:absolute;
       width:64px;height:64px;
       border-radius:18px;
       border:1px solid rgba(245,245,238,0.45);
@@ -215,6 +220,10 @@
       transition:transform .08s ease,background .12s ease,border-color .12s ease;
       box-shadow:0 4px 16px -8px rgba(0,0,0,0.45);
     }
+    .tc-up   {top:0;   left:68px}
+    .tc-left {top:72px;left:0}
+    .tc-down {top:72px;left:68px}
+    .tc-right{top:72px;left:136px}
     .tc-btn:active,.tc-btn.tc-pressed{
       background:rgba(255,255,255,0.30);
       border-color:rgba(255,255,255,0.85);
@@ -256,15 +265,23 @@
       .overlay-controls{font-size:12px}
       .drive-btn{padding:14px 32px;font-size:15px}
 
-      /* Minimap: smaller, top-left, frosted card.                       */
-      #minimap{bottom:auto;top:12px;left:12px;border-radius:12px;border:1px solid rgba(80,70,55,0.32);box-shadow:0 4px 18px -8px rgba(20,15,10,0.32)}
-      #minimap canvas{width:110px;height:110px;display:block}
+      /* Top of screen lays out vertically: progress bar across the
+         top (almost full-width), then a gap, then the minimap + HUD
+         row tucked beneath. Bottom-center is reserved for the pad. */
+
+      /* Progress bar — near-full-width band at the top edge.           */
+      #progress-bar{top:14px;left:16px;right:16px;width:auto;transform:none;height:5px}
+
+      /* Minimap pushed below the progress bar with a comfortable gap.  */
+      #minimap{bottom:auto;top:48px;left:12px;border-radius:12px;border:1px solid rgba(80,70,55,0.32);box-shadow:0 4px 18px -8px rgba(20,15,10,0.32)}
+      #minimap canvas{width:90px;height:90px;display:block}
       #map-scale{display:none}
 
       /* HUD readout: paired with the minimap visually. Same border
-         radius + frosted bg + size class. Sits top-right, compact.     */
+         radius + frosted bg + size class. Sits top-right (aligned with
+         the minimap row, not the progress bar).                        */
       #hud-left{
-        right:12px;left:auto;bottom:auto;top:12px;
+        right:12px;left:auto;bottom:auto;top:48px;
         min-width:96px;max-width:46vw;
         padding:8px 12px;
         font-size:11px;line-height:1.5;text-align:right;
@@ -281,9 +298,6 @@
       /* Hide the standalone level indicator on mobile — the dots in
          the HUD readout already communicate stability. Saves a slot.   */
       #level-indicator{display:none}
-
-      /* Progress bar — keep at top (above the chrome row).              */
-      #progress-bar{top:8px;width:120px}
 
       /* Finish screen — tighter padding for small phones.               */
       .fin-card{padding:18px 18px 22px;max-width:100%}
