@@ -186,7 +186,19 @@
       pointer-events:none;
     }
     body.touch-on #touch-controls{display:block}
-    @media (max-width:768px){#touch-controls{display:block}}
+    /* Auto-show on phones AND tablets (≤1024px). On these sizes the
+       touch pad IS the primary input, so we anchor it bottom-right to
+       leave room for minimap + HUD across the top. Desktop keeps the
+       default bottom-center position because it only appears via the
+       toggle pill. */
+    @media (max-width:1024px){
+      #touch-controls{
+        display:block;
+        left:auto;
+        transform:none;
+        right:max(20px,env(safe-area-inset-right,20px));
+      }
+    }
     /* Hide the pad + toggle pill while the splash overlay is visible —
        the pad isn't useful on the start screen. Both #overlay and the
        touch elements are direct children of body, so the general
@@ -261,7 +273,9 @@
     body.touch-on #touch-toggle{
       bottom:max(180px,calc(env(safe-area-inset-bottom,0px) + 180px));
     }
-    @media (max-width:768px){#touch-toggle{display:none}}
+    /* Hide the toggle on phones AND tablets — the pad auto-shows at
+       those sizes, so there's nothing to opt into.                    */
+    @media (max-width:1024px){#touch-toggle{display:none}}
     /* Desktop: make the pill subtle — keyboard is the primary input. */
     @media (min-width:1025px){
       #touch-toggle{
@@ -280,38 +294,36 @@
       }
     }
 
-    /* ─── Mobile layout (≤768px) ────────────────────────────────────────
-       Top-left + top-right corners become a balanced telemetry pair:
-       minimap (left) and HUD readout (right) share the same frosted-glass
-       styling so they read as one unit, not two random elements. Center
-       top is the progress bar. Bottom-center is the touch pad. */
-    @media (max-width:768px){
+    /* ─── Phone + tablet layout (≤1024px) ───────────────────────────────
+       Minimap and HUD readout are stacked horizontally as a paired
+       telemetry unit at top-left, with the HUD tucked immediately to
+       the right of the minimap so the two feel like one card. Progress
+       bar spans the top edge. Bottom-right is reserved for the touch
+       pad. */
+    @media (max-width:1024px){
       #overlay{padding:5vh 6vw}
-      #overlay h1{font-size:clamp(38px,9vw,60px)}
+      #overlay h1{font-size:clamp(38px,9vw,68px)}
       .subtitle{font-size:13px}
       .overlay-controls{font-size:12px}
       .drive-btn{padding:14px 32px;font-size:15px}
-
-      /* Top of screen lays out vertically: progress bar across the
-         top (almost full-width), then a gap, then the minimap + HUD
-         row tucked beneath. Bottom-center is reserved for the pad. */
 
       /* Progress bar — near-full-width band at the top edge.           */
       #progress-bar{top:14px;left:16px;right:16px;width:auto;transform:none;height:5px}
 
       /* Minimap pushed below the progress bar with a comfortable gap.  */
       #minimap{bottom:auto;top:48px;left:12px;border-radius:12px;border:1px solid rgba(80,70,55,0.32);box-shadow:0 4px 18px -8px rgba(20,15,10,0.32)}
-      #minimap canvas{width:90px;height:90px;display:block}
+      #minimap canvas{width:100px;height:100px;display:block}
       #map-scale{display:none}
 
-      /* HUD readout: paired with the minimap visually. Same border
-         radius + frosted bg + size class. Sits top-right (aligned with
-         the minimap row, not the progress bar).                        */
+      /* HUD readout — sits IMMEDIATELY TO THE RIGHT of the minimap so
+         the two chrome cards read as a single telemetry unit. The
+         12px + 100px + 10px math places its left edge just past the
+         minimap's right edge with a comfortable gap.                   */
       #hud-left{
-        right:12px;left:auto;bottom:auto;top:48px;
-        min-width:96px;max-width:46vw;
+        left:calc(12px + 100px + 10px);right:auto;bottom:auto;top:48px;
+        min-width:96px;max-width:calc(100vw - (12px + 100px + 10px) - 12px);
         padding:8px 12px;
-        font-size:11px;line-height:1.5;text-align:right;
+        font-size:11px;line-height:1.5;text-align:left;
         background:rgba(245,238,222,0.55);
         border:1px solid rgba(80,70,55,0.32);
         border-radius:12px;
@@ -319,11 +331,11 @@
         backdrop-filter:blur(8px) saturate(140%);
         box-shadow:0 4px 18px -8px rgba(20,15,10,0.32);
       }
-      #hud-right{right:12px;top:auto;bottom:auto;font-size:11px;line-height:1.5}
+      #hud-right{left:calc(12px + 100px + 10px);right:auto;top:auto;bottom:auto;font-size:11px;line-height:1.5}
       .hud-title{font-size:12px;margin-bottom:2px}
 
-      /* Hide the standalone level indicator on mobile — the dots in
-         the HUD readout already communicate stability. Saves a slot.   */
+      /* Hide the standalone level indicator on phones + tablets — the
+         dots in the HUD readout already communicate stability.         */
       #level-indicator{display:none}
 
       /* Finish screen — tighter padding for small phones.               */
