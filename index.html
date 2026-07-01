@@ -191,7 +191,7 @@
        leave room for minimap + HUD across the top. Desktop keeps the
        default bottom-center position because it only appears via the
        toggle pill. */
-    @media (max-width:1024px){
+    @media (max-width:1200px){
       #touch-controls{
         display:block;
         left:auto;
@@ -275,9 +275,9 @@
     }
     /* Hide the toggle on phones AND tablets — the pad auto-shows at
        those sizes, so there's nothing to opt into.                    */
-    @media (max-width:1024px){#touch-toggle{display:none}}
+    @media (max-width:1200px){#touch-toggle{display:none}}
     /* Desktop: make the pill subtle — keyboard is the primary input. */
-    @media (min-width:1025px){
+    @media (min-width:1201px){
       #touch-toggle{
         padding:4px 11px;
         font-size:10px;
@@ -300,7 +300,7 @@
        the right of the minimap so the two feel like one card. Progress
        bar spans the top edge. Bottom-right is reserved for the touch
        pad. */
-    @media (max-width:1024px){
+    @media (max-width:1200px){
       #overlay{padding:5vh 6vw}
       #overlay h1{font-size:clamp(38px,9vw,68px)}
       .subtitle{font-size:13px}
