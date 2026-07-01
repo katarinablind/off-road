@@ -435,12 +435,14 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script type="importmap">
-  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js"}}
-  </script>
 
   <script type="module">
-    import * as THREE from 'three';
+    // Direct URL import so we don't depend on <script type="importmap">.
+    // Import maps require Safari 16.4+ (iPadOS 16.4+); older iPads on
+    // iPadOS 15 or 16.0–16.3 silently fail on the bare 'three' specifier
+    // and the game appears as a blank dark-green screen. Using the full
+    // URL works on every browser that supports ES modules (iPadOS 12+).
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js';
 
     // ─── Themes ──────────────────────────────────────────
     const THEMES={
